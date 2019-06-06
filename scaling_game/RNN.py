@@ -106,10 +106,10 @@ class LinearRegression(torch.nn.Module):
     
 class RLS(LinearRegression):
     # get the first N data points and start, data x here is concat version of x and 1
-    def __init__(self, alpha): 
+    def __init__(self, alpha, lam = 0.5): 
         LinearRegression.__init__(self, alpha)
         # forget factor 
-        self.lam = 0.5
+        self.lam = lam
     # update inverse correlation matrix by new data    
         
     def update_beta(self, x1, y1, trial):
