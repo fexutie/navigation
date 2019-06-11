@@ -38,7 +38,7 @@ from scipy import signal
 
 
 # attention to noise level, here corresponed to pretraining , so set noise to 1 
-def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2):
+def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2, epsilon = 0):
     game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = 32, test = test)
     done = False
     if init_hidden == True:
@@ -53,7 +53,7 @@ def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torc
     Pos = []
     Pos.append(game.agent.pos)
     while not done:
-        pos0, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test=True) # Down
+        pos0, state, reward, done = game.step(game.maxplay, epsilon = epsilon, test=True) # Down
         Hidden.append(game.hidden.data.numpy().squeeze())
         dH.append(torch.norm(game.hidden - hidden0))
         Pos.append(game.agent.pos)
@@ -329,7 +329,7 @@ def variance_decompose(pca, T, open_loop = True, alpha = 1e-4):
         Importances.append(Importance)
     return importances
 
-def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1, context_gain = 1):
+def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1, context_gain = 1, num_trials = 10):
     # reference from net 1 
     def placefield(pos): 
         field =np.zeros((2, 19))
@@ -350,7 +350,7 @@ def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1, contex
     pca.game.net.k_stim = k_stim
     for pos_reward in [(9, 5), (9, 13)]:
         context = context_gain * placefield(pos_reward)
-        pca.Dynamics(Actions = 10 * [0], legend = True, T_total = 200, T_stim = 30, T_duration = 3, \
+        pca.Dynamics(Actions = num_trials * [0], legend = True, T_total = 200, T_stim = 30, T_duration = 3, \
                      readout_random = True, open_loop = False, e = epsilon, context = context)
         for i in range(8):
             T = 20 + i * 20

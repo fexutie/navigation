@@ -1,7 +1,5 @@
 # Pretraining with standard weigths scaling, lr rate function as 1e-5,  regulizor 1e-6.  The context is given as game, the loss function target is direct target without exp(-z2)
 
-%load_ext autoreload
-%autoreload 2
 
 import numpy as np
 from itertools import count
@@ -21,7 +19,6 @@ import matplotlib.mlab as mlab
 import matplotlib.pyplot as plt
 import matplotlib.animation
 import seaborn as sns
-from IPython.display import HTML
 
 from collections import OrderedDict
 
@@ -35,16 +32,18 @@ from navigation2 import *
 import Nets
 from Nets import *
 
-%pylab inline
 import warnings
 warnings.filterwarnings('ignore')
-Pretest =  PretrainTest(weight_write = 'weights_cpu/rnn_1515tanh512_checkpoint', holes = 0)
 
-# two different contexts, change beta 
-Pretest =  PretrainTest(weight_write = 'weights_cpu/rnn_1515tanh512_checkpoint', holes = 0, k_action = 1, k_internal = 1.)
-beta = 1e-2
-for i in range(400):
-    Pretest.pretrain(i, pretrain = (i!=0), lr = 1e-5, beta = beta, beta_min = 1e-2, beta_max = 1)
+# two different contexts, change beta in a curriculum way 
+Pretest =  PretrainTest(weight_write = 'weights_cpu/rnn_1515tanh512_checkpoint', holes = 0, k_action =1, k_internal = 1)
+for i in range(0, 400):
+    if i<=10:
+        k = 1
+    else:
+        k = (i//40 + 2) 
+    beta = k * 1e-2
+    Pretest.pretrain(i, pretrain = True, lr = 1e-5, beta = beta, beta_min = k * 1e-2, beta_max = k * 1e-2)
     net = Pretest.pregame.net.cpu()
     torch.save(net.state_dict(), 'weights_cpu/rnn_1515tanh512_checkpoint{}'.format(i))
     
