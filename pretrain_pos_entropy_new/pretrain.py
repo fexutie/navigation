@@ -44,6 +44,8 @@ class PretrainGame(Game):
         self.trace = []
         self.hiddens = []
         self.Hiddens = []
+        self.y = 0
+        self.x = 0
         self.Qs = []
         self.Pos = []
         self.time_limit = time_limit
@@ -63,12 +65,13 @@ class PretrainGame(Game):
         field = - 0.1 * torch.from_numpy(field).resize(1, 2 * (self.max_size + 4)).float()
         return field 
     # target dirac
-    def placefield_target(self): 
+    def placefield_target(self):
+        pos = (self.y, self.x)
         field =np.zeros((2, self.max_size + 4))
         for k in range(2):
             for i in range(field.shape[1]): 
             # distance generation 
-                field[k, i] =  (i- self.agent.pos[k]) ** 2 
+                field[k, i] =  (i- pos[k]) ** 2
         # gaussian density, but before exponential to help learning identity mapping input to output
         field = torch.from_numpy(field).resize(1, 2 * (self.max_size + 4)).float()
         return field 
@@ -99,16 +102,14 @@ class PretrainGame(Game):
 #         self.action = Variable(torch.eye(4)[Action]).resize(1, 4).cuda()  
         return Action, action0
 
-    # because of stop gradient, train only one step before 
+    # in step, the action will be integrated into x and y
     def step(self):  
         """Update state (grid and agent) based on an action"""
-        pos0 = self.agent.pos
+
         action = self.sample()
-        self.agent.act(action)
-        pos1 = self.agent.pos
-         # wall detection  
-        return pos0, action, pos1
-    # here only the network is only trained to predict intial position 
+        # up
+
+    # here only the network is only trained to predict intial position
 
     
     def experiment(self, low = 10 , high = 100, e = 0.1, batchsize = 4, size_range = []):   
@@ -120,35 +121,51 @@ class PretrainGame(Game):
         steps = np.random.randint(low = low, high = high, size = 1)
         for i in range(batchsize):
             self.reset(size_range = size_range, prob = np.ones(len(size_range))/len(size_range))
+            self.y, self.x = self.agent.pos
             actions = []
             inputs = []
             targets = []
             # initialize the random hidden state
             while self.t <steps.item():
                 if self.t == 0:
-                    pos0, action, pos1 = self.step()
+                    action = self.sample()
+                # move according to probability
                 elif self.t>0:
                     if np.random.random()>0.8:
-                        pos0, action, pos1 = self.step()
+                        action = self.sample()
                     else:
                         action = action
+                # save old position
+                y0, x0 = self.y, self.x
+                # move
+                if action == 0:
+                    self.y -= 1
+                    # right
+                elif action == 1:
+                    self.x += 1
+                    # down
+                elif action == 2:
+                    self.y += 1
+                    # left
+                elif action == 3:
+                    self.x -= 1
                 self.t += 1
                 #prepare network input for next step, register in self.action, size should be 1d  
-                self.action_ = torch.eye(4)[action].resize(4).cuda()
-                # recording sessin, here network input and target is stored, network input is vision and this step action, 
-                vision = self.visible_state
+
+                # recording sessin, here network input and target is stored, network input is vision and this step action,
+                visible_state = self.grid.visible((self.y, self.x)).flatten()
+                if self.grid.grid[(self.y, self.x)] < 0:
+                    pos_possible = [(a, pos) for (a,pos) in enumerate([(y0-1,x0),(y0,x0+1),(y0+1,x0),(y0,x0-1)]) if self.grid.grid[pos] >= 0]
+                    action, pos = pos_possible[np.random.randint(len(pos_possible))]
+                    self.y, self.x = pos
                 # all flatten
-                self.input = torch.FloatTensor(self.visible_state).resize(9).cuda()
+                self.input = torch.FloatTensor(visible_state).resize(9).cuda()
+                self.action_ = torch.eye(4)[action].resize(4).cuda()
                 actions.append(self.action_)
                 inputs.append(self.input) 
                 targets.append(self.placefield_target().float().cuda())
                 # ensure not inside wall
-                if self.grid.grid[pos1] < 0:
-                    self.agent.pos = pos0
-                    y,x = pos0      
-                    pos_possible = [(a, pos) for (a,pos) in enumerate([(y-1,x),(y,x+1),(y+1,x),(y,x-1)]) if self.grid.grid[pos] >= 0]
-                    action, pos = pos_possible[np.random.randint(len(pos_possible))]
-                    self.agent.pos = pos
+
             Actions.append(torch.stack(actions))
             Inputs.append(torch.stack(inputs))
             Targets.append(torch.stack(targets))
@@ -173,7 +190,7 @@ class PretrainGame(Game):
         Targets = torch.transpose(torch.stack(Targets), 0, 1).cuda()
         hidden0 = self.net.initHidden(batchsize).cuda()
         for epochs in range (50):
-                reward_input = torch.stack([self.placefield_reward((9, 9)) for i in range(batchsize)]).squeeze().cuda()
+                reward_input = torch.stack([self.placefield_reward((9, 6)) for i in range(batchsize)]).squeeze().cuda()
                 predicts, hiddens = self.net.forward_sequence(Inputs, hidden0, Actions, reward_input, control = self.reward_control)
                 # cross entropy 
                 hiddens = torch.stack(hiddens)
