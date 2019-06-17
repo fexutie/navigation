@@ -113,7 +113,7 @@ class PretrainGame(Game):
 
     # here only the network is only trained to predict intial position
 
-    def experiment(self, low = 30, high = 50, e= 0.1, batchsize=4, size_range=[]):
+    def experiment(self, low = 40, high = 45, e= 0.1, batchsize=4, size_range=[]):
         # register for datalaoder
         self.e = e
         Actions = []
@@ -221,8 +221,8 @@ class PretrainGame(Game):
                 loss_predict1 = sum([self.net.crossentropy(predict, target, batchsize, beta = beta) for predict,target in zip(predicts1, Targets)])
                 loss_predict2 = sum([self.net.crossentropy(predict, target, batchsize, beta = 3 * beta) for predict,target in zip(predicts2, Targets)])
                 loss_predict3 = sum([self.net.crossentropy(predict, target, batchsize, beta = 9 * beta) for predict,target in zip(predicts3, Targets)])
-                # loss_metabolic = 1e-3 * torch.norm(hiddens)
-                loss_predict = loss_predict1 + loss_predict2 + loss_predict3
+                loss_metabolic = 1e-3 * torch.norm(hiddens)
+                loss_predict = loss_predict1 + loss_predict2 + loss_predict3 + loss_metabolic
                 loss_predict.backward(retain_graph = True)
             # gradient clip , from -max to max
                 for p, name in zip([self.net.i2h, self.net.a2h, self.net.h2h, self.net.bh],\
@@ -233,20 +233,21 @@ class PretrainGame(Game):
             self.Loss1 += loss_predict1
             self.Loss2 += loss_predict2
             self.Loss3 += loss_predict3
-            # self.Loss_meta += loss_metabolic
+            self.Loss_meta += loss_metabolic
             # clear gradient
             self.net.zero_grad()
                 
-    def fulltrain(self, lr_rate = 1e-4, decay = 1e-6, trials = 100, low = 10, high = 100, batchsize = 4, size_range = np.arange(10, 20, 1), beta = 1e-2):
+    def fulltrain(self, lr_rate = 1e-4, decay = 1e-6, trials = 100, low = 40, high = 45, batchsize = 4, size_range = np.arange(10, 20, 1), beta = 1e-2):
         self.Loss1 = 0
         self.Loss2 = 0
         self.Loss3 = 0
+        self.Loss_meta = 0
         # start to experiment
         for i in range(trials):
             Actions, Inputs, Targets = self.experiment(low = low, high = high, batchsize = batchsize, size_range = size_range)
             self.train(lr_rate, Actions, Inputs, Targets, decay = decay, beta = beta)
             if i%50 == 0 and i>0:
-                print ('loss for epoch:', self.Loss1, self.Loss2, self.Loss3)
+                print ('loss for epoch:', self.Loss1, self.Loss2, self.Loss3, self.Loss_meta)
                 self.Loss1 = 0
                 self.Loss2 = 0
                 self.Loss3 = 0
