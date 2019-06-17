@@ -66,31 +66,38 @@ class PretrainTest():
         print ('pretrain end', torch.norm(self.pregame.net.h2h), torch.norm(self.pregame.net.a2h))
             
               
-    def decode(self, weight = None, size_range = [15], size_test = [15], epsilon = 0):
+    def decode(self, weight=None, size_range=[15], size_test=[15], epsilon=0, k_action=1):
         if weight != None:
             self.game.net.load_state_dict(torch.load(weight))
         else:
             self.game.net.load_state_dict(torch.load(self.weight))
+        self.game.net.k_action = k_action
         rls_q = RLS(1e2)
         rls_sl = RLS(1e2)
-        def precision(size = 15, reward_control = 0):
-            dist, decode, visit, entropy = decodetest(self.game, reward_control= reward_control, epsilon = 0, size = size)
+
+        def precision(size=15, reward_control=0):
+            dist, decode, visit = decodetest(self.game, reward_control=reward_control, epsilon = epsilon,
+                                                           size=size)
             prec0 = np.mean(dist)
-            return np.mean(decode[2:-2, 2:-2]/visit[2:-2, 2:-2]), entropy
+            return np.mean(decode / visit), decode / visit
+
         Prec = 0
-        Entropy = 0
-        # iterations are number of turns for decoder update, epochs are how many turns of games at each update  
+        # iterations are number of turns for decoder update, epochs are how many turns of games at each update
+        Prec_matrix = np.zeros((15, 15))
         for reward_control in [0, 1]:
-            self.game.experiment(rls_q, rls_sl, iterations = 1, epochs = 100, epsilon = epsilon, train_hidden = False, train_q = False, size_range = size_range, test = True, decode = True, reward_control = reward_control) 
-            prec, entropy =  precision(size = size_test[0], reward_control = reward_control)
+            self.game.experiment(rls_q, rls_sl, iterations=50, epochs=5, epsilon=epsilon, train_hidden=False,
+                                 train_q=False, size_range=size_range, test=True, decode=True,
+                                 reward_control=reward_control)
+            prec, prec_matrix = precision(size=size_test[0], reward_control=reward_control)
             Prec += prec
-            Entropy += entropy
+            Prec_matrix += prec_matrix
             print(self.game.reward_control, prec)
         # tested on size 15
-        Prec = Prec/2 
-        Entropy = Entropy/2  
-        print ('decode train finish', Prec, Entropy)
-        return Prec, Entropy
+        Prec = Prec / 2
+        Prec_matrix = Prec_matrix / 2
+        print('decode train finish', Prec)
+        return Prec, Prec_matrix
+
     
         
     def qlearn(self, weight_read, weight_write, iterations = 5, save = True, size_train = np.arange(10, 51, 10), \
