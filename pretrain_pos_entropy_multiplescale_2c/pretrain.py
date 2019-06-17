@@ -182,11 +182,11 @@ class PretrainGame(Game):
         # training
         optimizer = torch.optim.Adam(
                 [ 
-                {'params': self.net.h2p1, 'lr': 100 * lr_rate, 'weight_decay': 100 * decay},
-                {'params': self.net.h2p2, 'lr': 30 * lr_rate, 'weight_decay':30 * decay},
+                {'params': self.net.h2p1, 'lr': 100 * lr_rate, 'weight_decay': decay},
+                {'params': self.net.h2p2, 'lr': 30 * lr_rate, 'weight_decay': decay},
                 {'params': self.net.h2p3, 'lr': 10 * lr_rate, 'weight_decay':10 * decay},
-                {'params': self.net.h2p1_r2, 'lr': 100 * lr_rate, 'weight_decay': 100 * decay},
-                {'params': self.net.h2p2_r2, 'lr': 30 * lr_rate, 'weight_decay': 30 * decay},
+                {'params': self.net.h2p1_r2, 'lr': 100 * lr_rate, 'weight_decay': decay},
+                {'params': self.net.h2p2_r2, 'lr': 30 * lr_rate, 'weight_decay': decay},
                 {'params': self.net.h2p3_r2, 'lr': 10 * lr_rate, 'weight_decay': 10 * decay},
                 {'params': self.net.i2h, 'lr': lr_rate, 'weight_decay':decay},
 #                 {'params': self.net.r2h, 'lr': lr_rate, 'weight_decay':0},
