@@ -84,7 +84,7 @@ class PretrainTest():
         # iterations are number of turns for decoder update, epochs are how many turns of games at each update
         Prec_matrix = np.zeros((15, 15))
         for reward_control in [0, 1]:
-            self.game.experiment(rls_q, rls_sl, iterations=50, epochs=1, epsilon=epsilon, train_hidden=False,
+            self.game.experiment(rls_q, rls_sl, iterations=50, epochs=5, epsilon=epsilon, train_hidden=False,
                                  train_q=False, size_range=size_range, test=True, decode=True,
                                  reward_control=reward_control)
             prec, prec_matrix = precision(size=size_test[0], reward_control=reward_control)

@@ -344,7 +344,7 @@ def decodetest(game, weights = 0, epsilon = 0, reward_control = [0], trial = (0,
     #                     print (pos.data.numpy()[0], game.agent.pos[0])
                     manhantondist = np.abs((pos.data.numpy()[0][0] - pos0[0])) + \
                     np.abs((pos.data.numpy()[0][1] - pos0[1]))
-                    decodes[pos0] += 0.5 * manhantondist
+                    decodes[pos0] +=  manhantondist
                     visit[pos0] += 1
                     Dist.append(manhantondist)
                 # plot only if true 

@@ -38,8 +38,8 @@ from scipy import signal
 
 
 # attention to noise level, here corresponed to pretraining , so set noise to 1 
-def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2, epsilon = 0):
-    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = 32, test = test)
+def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2, epsilon = 0, limit_set = 8):
+    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = limit_set, test = test)
     done = False
     if init_hidden == True:
         game.hidden = game.net.initHidden()
@@ -52,7 +52,7 @@ def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torc
     State = []
     Pos = []
     Pos.append(game.agent.pos)
-    while not done:
+    for i in range(limit_set * game.grid_size[0]):
         pos0, state, reward, done = game.step(game.maxplay, epsilon = epsilon, test=True) # Down
         Hidden.append(game.hidden.data.numpy().squeeze())
         dH.append(torch.norm(game.hidden - hidden0))
