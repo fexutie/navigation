@@ -62,7 +62,7 @@ class PretrainTest():
                 beta = beta_min + (beta_max - beta_min) * trial/400
             else:
                 beta = beta_max
-            self.pregame.fulltrain(lr_rate = lr, trials = int(1e2), batchsize = 4, beta = beta)
+            self.pregame.fulltrain(lr_rate = lr, trials = int(1e2), batchsize = 2, beta = beta)
         print ('pretrain end', torch.norm(self.pregame.net.h2h), torch.norm(self.pregame.net.a2h))
             
               

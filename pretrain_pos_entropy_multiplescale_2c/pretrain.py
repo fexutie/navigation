@@ -113,7 +113,7 @@ class PretrainGame(Game):
 
     # here only the network is only trained to predict intial position
 
-    def experiment(self, low=10, high=100, e=0.1, batchsize=4, size_range=[]):
+    def experiment(self, low = 30, high = 50, e= 0.1, batchsize=4, size_range=[]):
         # register for datalaoder
         self.e = e
         Actions = []
@@ -127,15 +127,16 @@ class PretrainGame(Game):
             inputs = []
             targets = []
             # initialize the random hidden state
-            while self.t < steps.item():
-                if self.t == 0:
-                    action = self.sample()
+            Done = False
+            start = 0
+            action = self.sample()
+            e = 0.1 * np.random.randint(6, 9)
+            while Done == False :
                 # move according to probability
-                elif self.t > 0:
-                    if np.random.random() > 0.8:
-                        action = self.sample()
-                    else:
-                        action = action
+                if np.random.random() > e:
+                    action = self.sample()
+                else:
+                    action = action
                 # save old position
                 y0, x0 = self.y, self.x
                 # move
@@ -151,21 +152,27 @@ class PretrainGame(Game):
                 elif action == 3:
                     self.x -= 1
                 visible_state = self.grid.visible((self.y, self.x)).flatten()
+                if np.sum(visible_state) != 0:
+                    start = 1
                 if self.grid.grid[(self.y, self.x)] < 0:
                     pos_possible = [(a, pos) for (a, pos) in
                                     enumerate([(y0 - 1, x0), (y0, x0 + 1), (y0 + 1, x0), (y0, x0 - 1)]) if
                                     self.grid.grid[pos] >= 0]
                     action, pos = pos_possible[np.random.randint(len(pos_possible))]
                     self.y, self.x = pos
-                # all flatten
-                self.input = torch.FloatTensor(visible_state).resize(9).cuda(gpu)
-                self.action_ = torch.eye(4)[action].resize(4).cuda(gpu)
-                actions.append(self.action_)
-                inputs.append(self.input)
-                targets.append(self.placefield_target().float().cuda(gpu))
-                self.t += 1
+                # all flatten, record
+                if start == 1:
+                    self.input = torch.FloatTensor(visible_state).resize(9).cuda(gpu)
+                    self.action_ = torch.eye(4)[action].resize(4).cuda(gpu)
+                    actions.append(self.action_)
+                    inputs.append(self.input)
+                    targets.append(self.placefield_target().float().cuda(gpu))
+                    self.t += 1
+                if self.t == steps.item():
+                    Done = True
+                # print (start, self.t)
                 # ensure not inside wall
-
+            # after each trial
             Actions.append(torch.stack(actions))
             Inputs.append(torch.stack(inputs))
             Targets.append(torch.stack(targets))
@@ -176,66 +183,70 @@ class PretrainGame(Game):
         optimizer = torch.optim.Adam(
                 [ 
                 {'params': self.net.h2p1, 'lr': 100 * lr_rate, 'weight_decay': 100 * decay},
-                {'params': self.net.h2p2, 'lr': 10 * lr_rate, 'weight_decay':10 * decay},
-                {'params': self.net.h2p3, 'lr': 1 * lr_rate, 'weight_decay':decay},
+                {'params': self.net.h2p2, 'lr': 30 * lr_rate, 'weight_decay':30 * decay},
+                {'params': self.net.h2p3, 'lr': 10 * lr_rate, 'weight_decay':10 * decay},
                 {'params': self.net.h2p1_r2, 'lr': 100 * lr_rate, 'weight_decay': 100 * decay},
-                {'params': self.net.h2p2_r2, 'lr': 10 * lr_rate, 'weight_decay': 10 * decay},
-                {'params': self.net.h2p3_r2, 'lr': 1 * lr_rate, 'weight_decay': decay},
-                {'params': self.net.i2h, 'lr': lr_rate, 'weight_decay':0},
+                {'params': self.net.h2p2_r2, 'lr': 30 * lr_rate, 'weight_decay': 30 * decay},
+                {'params': self.net.h2p3_r2, 'lr': 10 * lr_rate, 'weight_decay': 10 * decay},
+                {'params': self.net.i2h, 'lr': lr_rate, 'weight_decay':decay},
 #                 {'params': self.net.r2h, 'lr': lr_rate, 'weight_decay':0},
-                {'params': self.net.a2h, 'lr': lr_rate, 'weight_decay':0},    
+                {'params': self.net.a2h, 'lr': lr_rate, 'weight_decay':decay},    
                 {'params': self.net.h2h, 'lr': lr_rate, 'weight_decay':decay},
 #                 {'params': self.net.r, 'lr': lr_rate, 'weight_decay':0},# not useful 
                 {'params': self.net.bh, 'lr': lr_rate},
                 {'params': self.net.bp1, 'lr': 100 * lr_rate},
-                {'params': self.net.bp2, 'lr': 10 * lr_rate},
-                {'params': self.net.bp3, 'lr': 1 * lr_rate},
+                {'params': self.net.bp2, 'lr': 30 * lr_rate},
+                {'params': self.net.bp3, 'lr': 10 * lr_rate},
                 {'params': self.net.bp1_r2, 'lr': 100 * lr_rate},
-                {'params': self.net.bp2_r2, 'lr': 10 * lr_rate},
-                {'params': self.net.bp3_r2, 'lr': 1 * lr_rate}
+                {'params': self.net.bp2_r2, 'lr': 30 * lr_rate},
+                {'params': self.net.bp3_r2, 'lr': 10 * lr_rate}
                 ])
         batchsize = len(Inputs)
         # put batch size before sequence length   
         Actions = torch.transpose(torch.stack(Actions), 0, 1).cuda(gpu)
         Inputs = torch.transpose(torch.stack(Inputs), 0, 1).cuda(gpu)
         Targets = torch.transpose(torch.stack(Targets), 0, 1).cuda(gpu)
-        hidden0 = self.net.initHidden(batchsize).cuda(gpu)
         for epochs in range (50):
-            reward_control = np.random.randint(0, 2)
-            if reward_control == 0:
-                reward_input = torch.stack([self.placefield_reward(self.Set_reward[0]) for i in range(batchsize)]).squeeze().cuda(gpu)
-            else:
-                reward_input = torch.stack([self.placefield_reward(self.Set_reward[1]) for i in range(batchsize)]).squeeze().cuda(gpu)
-            predicts1, predicts2, predicts3, hiddens = self.net.forward_sequence(Inputs, hidden0, Actions, reward_input, control = self.reward_control)
-            # cross entropy
-            hiddens = torch.stack(hiddens)
-            loss_predict1 = sum([self.net.crossentropy(predict, target, batchsize, beta = beta) for predict,target in zip(predicts1, Targets)])
-            loss_predict2 = sum([self.net.crossentropy(predict, target, batchsize, beta = 3 * beta) for predict,target in zip(predicts2, Targets)])
-            loss_predict3 = sum([self.net.crossentropy(predict, target, batchsize, beta = 9 * beta) for predict,target in zip(predicts3, Targets)])
-            loss_metabolic = 1e-3 * torch.norm(hiddens)
-            loss_predict = loss_predict1 + loss_predict2 + loss_predict3 + loss_metabolic
-            loss_predict.backward(retain_graph = True)
+            # reward_control = np.random.randint(0, 2)
+            # if reward_control == 0:
+            #     reward_input = torch.stack([self.placefield_reward(self.Set_reward[0]) for i in range(batchsize)]).squeeze().cuda(gpu)
+            # else:
+            #     reward_input = torch.stack([self.placefield_reward(self.Set_reward[1]) for i in range(batchsize)]).squeeze().cuda(gpu)
+            for i in range(2):
+                hidden0 = self.net.initHidden(batchsize).cuda(gpu)
+                reward_input = torch.stack([self.placefield_reward(self.Set_reward[i]) for i in range(batchsize)]).squeeze().cuda(gpu)
+                predicts1, predicts2, predicts3, hiddens = self.net.forward_sequence(Inputs, hidden0, Actions, reward_input, control = i)
+                # cross entropy
+                hiddens = torch.stack(hiddens)
+                loss_predict1 = sum([self.net.crossentropy(predict, target, batchsize, beta = beta) for predict,target in zip(predicts1, Targets)])
+                loss_predict2 = sum([self.net.crossentropy(predict, target, batchsize, beta = 3 * beta) for predict,target in zip(predicts2, Targets)])
+                loss_predict3 = sum([self.net.crossentropy(predict, target, batchsize, beta = 9 * beta) for predict,target in zip(predicts3, Targets)])
+                # loss_metabolic = 1e-3 * torch.norm(hiddens)
+                loss_predict = loss_predict1 + loss_predict2 + loss_predict3
+                loss_predict.backward(retain_graph = True)
             # gradient clip , from -max to max
-            for p, name in zip([self.net.i2h, self.net.a2h, self.net.h2h, self.net.bh],\
-                               ['i2h','a2h', 'h2h', 'bh'] ):
-                    p.grad.data.clamp_(-1, 1)
-            optimizer.step()
+                for p, name in zip([self.net.i2h, self.net.a2h, self.net.h2h, self.net.bh],\
+                                   ['i2h','a2h', 'h2h', 'bh'] ):
+                        p.grad.data.clamp_(-1, 1)
+                optimizer.step()
             # count for print
             self.Loss1 += loss_predict1
             self.Loss2 += loss_predict2
             self.Loss3 += loss_predict3
-            self.Loss_meta += loss_metabolic
+            # self.Loss_meta += loss_metabolic
             # clear gradient
             self.net.zero_grad()
                 
     def fulltrain(self, lr_rate = 1e-4, decay = 1e-6, trials = 100, low = 10, high = 100, batchsize = 4, size_range = np.arange(10, 20, 1), beta = 1e-2):
-        self.Loss = 0
+        self.Loss1 = 0
+        self.Loss2 = 0
+        self.Loss3 = 0
         # start to experiment
         for i in range(trials):
             Actions, Inputs, Targets = self.experiment(low = low, high = high, batchsize = batchsize, size_range = size_range)
             self.train(lr_rate, Actions, Inputs, Targets, decay = decay, beta = beta)
             if i%50 == 0 and i>0:
-                print ('loss for epoch:', self.Loss1, self.Loss2, self.Loss3, self.Loss_meta)
+                print ('loss for epoch:', self.Loss1, self.Loss2, self.Loss3)
                 self.Loss1 = 0
                 self.Loss2 = 0
                 self.Loss3 = 0

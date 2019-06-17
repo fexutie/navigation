@@ -75,9 +75,9 @@ class RNN(nn.Module):
                 predicts2.append(hidden.matmul(self.h2p2) + self.bp2)
                 predicts3.append(hidden.matmul(self.h2p3) + self.bp3)
             else:
-                predicts1.append(hidden.matmul(self.h2p1) + self.bp1)
-                predicts2.append(hidden.matmul(self.h2p2) + self.bp2)
-                predicts3.append(hidden.matmul(self.h2p3) + self.bp3)
+                predicts1.append(hidden.matmul(self.h2p1_r2) + self.bp1_r2)
+                predicts2.append(hidden.matmul(self.h2p2_r2) + self.bp2_r2)
+                predicts3.append(hidden.matmul(self.h2p3_r2) + self.bp3_r2)
         return predicts1, predicts2, predicts3, hiddens
 
     def initHidden(self, batchsize = 1):
