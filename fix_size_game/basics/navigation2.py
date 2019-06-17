@@ -435,9 +435,7 @@ def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test
 
             done = False
             game.hidden = game.net.initHidden()
-            pos_r = game.set_reward[game.reward_control]
-            y, x = pos_r
-            pos_r = (2 * VISIBLE_RADIUS + int(game.grid_size[0] * y), 2 * VISIBLE_RADIUS + int(game.grid_size[1] * x))
+            pos_r = game.Set_reward[game.reward_control]
             while not done:
                 _, state, reward, done = game.step(game.maxplay, epsilon = epsilon, test = True, cross = cross) # Down
             # suppose goes up, and return to reward in middle and goe left 

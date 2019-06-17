@@ -176,20 +176,20 @@ class Game():
         self.size = size
         # set reward
         if len(self.set_reward) != 0:
-            Set_reward = []
+            self.Set_reward = []
             for pos in self.set_reward:
                 y, x = pos
-                Set_reward.append((2 * VISIBLE_RADIUS + int(size * y), 2 * VISIBLE_RADIUS + int(size * x)))
+                self.Set_reward.append((2 * VISIBLE_RADIUS + int(size * y), 2 * VISIBLE_RADIUS + int(size * x)))
             self.time_limit = int(self.size * limit_set) 
             radius = self.size//10 - 1
             if test!= None:
                 radius = test
-            self.grid = Grid(n_holes = self.holes, grid_size = (self.size, self.size), random_seed = self.seed, set_reward = Set_reward)
+            self.grid = Grid(n_holes = self.holes, grid_size = (self.size, self.size), random_seed = self.seed, set_reward = self.Set_reward)
             self.grid_size = (self.grid.grid_size_y, self.grid.grid_size_x)
             self.grid.grid[2:2+self.size, 2:2+self.size] = 0
             self.reward_control = reward_control
             # this variable is used to select which reward chosen as target
-            self.pos_reward = Set_reward[reward_control]
+            self.pos_reward = self.Set_reward[reward_control]
             # select the reward 
             self.grid.grid[self.pos_reward[0]-radius: self.pos_reward[0]+1+radius, self.pos_reward[1]-radius: self.pos_reward[1]+1+radius] = 1
         else:
