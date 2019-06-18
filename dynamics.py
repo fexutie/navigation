@@ -38,8 +38,8 @@ from scipy import signal
 
 
 # attention to noise level, here corresponed to pretraining , so set noise to 1 
-def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2):
-    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = 32, test = test)
+def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2, epsilon = 0, limit_set = 8):
+    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = limit_set, test = test)
     done = False
     if init_hidden == True:
         game.hidden = game.net.initHidden()
@@ -52,8 +52,8 @@ def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torc
     State = []
     Pos = []
     Pos.append(game.agent.pos)
-    while not done:
-        pos0, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test=True) # Down
+    for i in range(limit_set * game.grid_size[0]):
+        pos0, state, reward, done = game.step(game.maxplay, epsilon = epsilon, test=True) # Down
         Hidden.append(game.hidden.data.numpy().squeeze())
         dH.append(torch.norm(game.hidden - hidden0))
         Pos.append(game.agent.pos)
@@ -206,7 +206,7 @@ Actions = [2, 0, 1, 3], e = 0,  same = True, legend = False, corner = False, ope
                 self.Actions[iters1, iters2] = actions[T_stim:]
         
     def Dynamics_2clicks(self, T_total = 200, T_stim1 = [20, 3], T_stim2 = [20, 3], wall2 = -1,
-                        Hiddens = [], noise = 2, iters = 4, 
+                        Hiddens = [], noise = 2, iters = 4, context = torch.zeros(1, 38),
 action = [0], e = 0,  same = True, legend = False, corner = False, open_loop = True, readout_random = False, h2o = 1) :
         self.Attractors = []
         self.Timescale = []
@@ -233,7 +233,7 @@ action = [0], e = 0,  same = True, legend = False, corner = False, open_loop = T
             Stim3 = (T_total - (T_stim1[0] + T_stim1[1] + T_stim2[0] + T_stim2[1])) * [torch.zeros(9)] 
             self.Stim = torch.stack(Stim1 + Stim2 + Stim3)
                 # trace in empty room 
-            Pos1, hidden1, dh1, actions = trajectory_empty(pos1_, self.game, self.Stim, action_ = action, e = e, open_loop = open_loop)
+            Pos1, hidden1, dh1, actions = trajectory_empty(pos1_, self.game, self.Stim, action_ = action, e = e, open_loop = open_loop, context = context)
 #                 T_transient = np.sum(dh1[T_stim:]>1e-1)
 #                 self.Ts.append(T_transient)
             self.PC_traces = self.vect[:5] @ hidden1.T
@@ -329,22 +329,37 @@ def variance_decompose(pca, T, open_loop = True, alpha = 1e-4):
         Importances.append(Importance)
     return importances
 
-def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1):
-    Info_P = np.zeros(5)
-    Info_I = np.zeros(5)
-    Info_A = np.zeros(5)
+def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1, context_gain = 1, num_trials = 10):
+    # reference from net 1 
+    def placefield(pos): 
+        field =np.zeros((2, 19))
+        for k in range(2):
+            for i in range(field.shape[1]): 
+            # distance generation 
+                pos_relative = pos[k]
+                field[k, i] =  (i- pos_relative) ** 2 
+        field = - 0.1 * torch.from_numpy(field).resize(1, 2 * 19).float()
+        return field
+    Info_P = np.zeros(8)
+    Info_I = np.zeros(8)
+    Info_A = np.zeros(8)
     pca = PCA(weight = weight)
     pca.pca(T_duration = 3)
     pca.game.net.k_action = k_action
     pca.game.net.k_internal = k_internal
     pca.game.net.k_stim = k_stim
-    pca.Dynamics(Actions = 50 * [0], legend = True, T_total = 200, T_stim = 100, T_duration = 3, \
-                 readout_random = True, open_loop = False, e = epsilon)
-    for i in range(5):
-        T = 20 + i * 20
-        importances = variance_decompose(pca, T, open_loop=False)
-        Info_A[i] = importances[0]
-        Info_I[i] = importances[1]
-        Info_P[i] = importances[2] + importances[3]                        
+    for pos_reward in [(9, 5), (9, 13)]:
+        context = context_gain * placefield(pos_reward)
+        pca.Dynamics(Actions = num_trials * [0], legend = True, T_total = 200, T_stim = 30, T_duration = 3, \
+                     readout_random = True, open_loop = False, e = epsilon, context = context)
+        for i in range(8):
+            T = 20 + i * 20
+            importances = variance_decompose(pca, T, open_loop=False)
+            Info_A[i] += importances[0]
+            Info_I[i] += importances[1]
+            Info_P[i] += importances[2] + importances[3]  
+    Info_A = Info_A/2    
+    Info_P = Info_P/2  
+    Info_I = Info_I/2  
     print (np.mean(Info_A), np.mean(Info_I), np.mean(Info_P))
     return Info_A, Info_I, Info_P 
