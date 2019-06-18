@@ -42,5 +42,13 @@ for i in range(40):
     net = Pretest.pregame.net.cpu()
     torch.save(net.state_dict(), 'weights_cpu/rnn_1515tanh512_checkpoint{}'.format(i))
     
+# Pretest =  PretrainTest(weight_write = 'weights_cpu/rnn_1515tanh512_checkpoint35', holes = 0)
+# Pretest.pregame.net.load_state_dict(torch.load( 'weights_cpu/rnn_1515tanh512_checkpoint35'))
+# beta = 1e-2  
+# for i in range(35, 400):
+#     Pretest.pretrain(i, pretrain = True, lr = 1e-5, beta = beta)
+#     net = Pretest.pregame.net.cpu()
+#     torch.save(net.state_dict(), 'weights_cpu/rnn_1515tanh512_checkpoint{}'.format(i))
+    
     
     
