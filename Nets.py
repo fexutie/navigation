@@ -35,9 +35,8 @@ gpu = 2
 
 # A complete experiment including pretraining , decoding training, and q learning  
 class PretrainTest():
-    def __init__(self, weight_write, holes = 0, inputs_type = (0, 0), k_action=1, k_internal=1):
-        self.pregame = PretrainGame(grid_size = (15, 15), holes = holes, random_seed = 4 , set_reward = [(0.5, 0.25), (0.5, 0.75)], input_type = inputs_type[0], \
-                                    k_action = k_action, k_internal = k_internal)
+    def __init__(self, weight_write, holes = 0, inputs_type = (0, 0)):
+        self.pregame = PretrainGame(grid_size = (15, 15), holes = holes, random_seed = 4 , set_reward = [(0.5, 0.25), (0.5, 0.75)], input_type = inputs_type[0])
         self.game = ValueMaxGame(grid_size = (15, 15), holes = 0, random_seed = 4 , set_reward = [(0.5, 0.25), (0.5, 0.75)], input_type = inputs_type[1])
         self.weight = weight_write
             
@@ -99,11 +98,12 @@ class PretrainTest():
         return Prec, Prec_matrix
     
         
-    def qlearn(self, weight_read, weight_write, iterations = 5, save = True, size_train = np.arange(10, 51, 10), \
+    def qlearn(self, weight_read, weight_write, iterations = 5, save = True, size_train = np.arange(10, 51, 10), feedback = True, \
                size_test = [10, 30], train_only = False, test_only = False, noise = 0.3, h2o = True):
         self.game.net.load_state_dict(torch.load(weight_read))
         if h2o == True:
             self.game.net.h2o = nn.Parameter(torch.randn(512, 4) * 0.01 * np.sqrt(2.0/(512 + 4)))
+        self.game.feedback = feedback
         e_rate = [noise for r in range(iterations)] 
         rls_q = RLS(1e2)
         rls_sl = RLS(1e2)

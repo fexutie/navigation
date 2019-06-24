@@ -23,7 +23,6 @@ import POMDPgame_r
 from POMDPgame_r import *
 import RNN
 from RNN import *
-
 gpu = 2
 
 class PretrainGame(Game):
@@ -38,7 +37,7 @@ class PretrainGame(Game):
         self.alpha = 0.5
         self.lam = 0.5
         self.grid_size = grid_size
-        self.net = RNN(9, 512, 4, k_internal = k_internal, k_action = k_action).cuda(gpu)
+        self.net = RNN(9, 512, 4).cuda(gpu)
         self.hidden = self.net.initHidden(batchsize=batchsize).cuda(gpu)
         self.action = self.net.initAction(batchsize=batchsize).cuda(gpu)
         self.Loss = 0
@@ -175,7 +174,7 @@ class PretrainGame(Game):
                 [ 
                 {'params': self.net.h2p1, 'lr': 100 * lr_rate, 'weight_decay':0},
                 {'params': self.net.h2p2, 'lr': 100 * lr_rate, 'weight_decay':0},
-                {'params': self.net.h2p3, 'lr': 10 * lr_rate, 'weight_decay':10*decay},
+                {'params': self.net.h2p3, 'lr': 100 * lr_rate, 'weight_decay':0},
                 {'params': self.net.i2h, 'lr': lr_rate, 'weight_decay':0},
 #                 {'params': self.net.r2h, 'lr': lr_rate, 'weight_decay':0},
                 {'params': self.net.a2h, 'lr': lr_rate, 'weight_decay':0},    
@@ -184,15 +183,15 @@ class PretrainGame(Game):
                 {'params': self.net.bh, 'lr': lr_rate},
                 {'params': self.net.bp1, 'lr': 100 * lr_rate},
                 {'params': self.net.bp2, 'lr': 100 * lr_rate},
-                {'params': self.net.bp3, 'lr': 10 * lr_rate}
+                {'params': self.net.bp3, 'lr': 100 * lr_rate}
                 ])
         batchsize = len(Inputs)
         # put batch size before sequence length   
         Actions = torch.transpose(torch.stack(Actions), 0, 1).cuda(gpu)
         Inputs = torch.transpose(torch.stack(Inputs), 0, 1).cuda(gpu)
         Targets = torch.transpose(torch.stack(Targets), 0, 1).cuda(gpu)
+        hidden0 = self.net.initHidden(batchsize).cuda(gpu)
         for epochs in range (50):
-                hidden0 = self.net.initHidden(batchsize).cuda(gpu)
                 reward_input = torch.stack([self.placefield_reward((9, 5)) for i in range(batchsize)]).squeeze().cuda(gpu)
                 predicts1, predicts2, predicts3, hiddens = self.net.forward_sequence(Inputs, hidden0, Actions, reward_input, control = self.reward_control)
                 # cross entropy 
@@ -223,7 +222,7 @@ class PretrainGame(Game):
             Actions, Inputs, Targets = self.experiment(low = low, high = high, batchsize = batchsize, size_range = size_range)
             self.train(lr_rate, Actions, Inputs, Targets, decay = decay, beta = beta)
             if i%50 == 0 and i>0:
-                print('loss for epoch:', self.Loss1, self.Loss2, self.Loss3)
+                print ('loss for epoch:', self.Loss1, self.Loss2, self.Loss3)
                 self.Loss = 0       
 
 
