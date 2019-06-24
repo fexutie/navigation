@@ -31,7 +31,7 @@ import scipy
 from scipy.spatial import distance
 from scipy import signal
 
-
+gpu = 2
 
 # A complete experiment including pretraining , decoding training, and q learning  
 class PretrainTest():
@@ -53,7 +53,7 @@ class PretrainTest():
         
     def pretrain(self, trial, weight = None, lr = 1e-5, pretrain = True, beta = 1e-2, beta_min = 1e-2, beta_max = 1):  
         # start a pretrained game  
-        self.pregame.net.cuda()
+        self.pregame.net.cuda(gpu)
         if pretrain == True:
             lr = float(lr)
             if weight != None:

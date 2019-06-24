@@ -23,7 +23,7 @@ import POMDPgame_r
 from POMDPgame_r import *
 import RNN
 from RNN import *
-
+gpu = 2
 
 class PretrainGame(Game):
 
@@ -37,9 +37,9 @@ class PretrainGame(Game):
         self.alpha = 0.5
         self.lam = 0.5
         self.grid_size = grid_size
-        self.net = RNN(9, 512, 4).cuda()
-        self.hidden = self.net.initHidden(batchsize=batchsize).cuda()
-        self.action = self.net.initAction(batchsize=batchsize).cuda()
+        self.net = RNN(9, 512, 4).cuda(gpu)
+        self.hidden = self.net.initHidden(batchsize=batchsize).cuda(gpu)
+        self.action = self.net.initAction(batchsize=batchsize).cuda(gpu)
         self.Loss = 0
         self.lr = 0
         self.life = 0
@@ -104,7 +104,7 @@ class PretrainGame(Game):
         # action0 as input for network
         action0 = Action_
         self.values, self.hidden = self.net(state, hidden0, Action_)
-        #         self.action = Variable(torch.eye(4)[Action]).resize(1, 4).cuda()
+        #         self.action = Variable(torch.eye(4)[Action]).resize(1, 4).cuda(gpu)
         return Action, action0
 
 
@@ -155,11 +155,11 @@ class PretrainGame(Game):
                     action, pos = pos_possible[np.random.randint(len(pos_possible))]
                     self.y, self.x = pos
                 # all flatten
-                self.input = torch.FloatTensor(visible_state).resize(9).cuda()
-                self.action_ = torch.eye(4)[action].resize(4).cuda()
+                self.input = torch.FloatTensor(visible_state).resize(9).cuda(gpu)
+                self.action_ = torch.eye(4)[action].resize(4).cuda(gpu)
                 actions.append(self.action_)
                 inputs.append(self.input)
-                targets.append(self.placefield_target().float().cuda())
+                targets.append(self.placefield_target().float().cuda(gpu))
                 self.t += 1
                 # ensure not inside wall
 
@@ -187,12 +187,12 @@ class PretrainGame(Game):
                 ])
         batchsize = len(Inputs)
         # put batch size before sequence length   
-        Actions = torch.transpose(torch.stack(Actions), 0, 1).cuda()
-        Inputs = torch.transpose(torch.stack(Inputs), 0, 1).cuda()
-        Targets = torch.transpose(torch.stack(Targets), 0, 1).cuda()
-        hidden0 = self.net.initHidden(batchsize).cuda()
+        Actions = torch.transpose(torch.stack(Actions), 0, 1).cuda(gpu)
+        Inputs = torch.transpose(torch.stack(Inputs), 0, 1).cuda(gpu)
+        Targets = torch.transpose(torch.stack(Targets), 0, 1).cuda(gpu)
+        hidden0 = self.net.initHidden(batchsize).cuda(gpu)
         for epochs in range (50):
-                reward_input = torch.stack([self.placefield_reward((9, 5)) for i in range(batchsize)]).squeeze().cuda()
+                reward_input = torch.stack([self.placefield_reward((9, 5)) for i in range(batchsize)]).squeeze().cuda(gpu)
                 predicts1, predicts2, predicts3, hiddens = self.net.forward_sequence(Inputs, hidden0, Actions, reward_input, control = self.reward_control)
                 # cross entropy 
                 hiddens = torch.stack(hiddens)
@@ -207,18 +207,22 @@ class PretrainGame(Game):
                         p.grad.data.clamp_(-1, 1)
                 optimizer.step()
                 # count for print 
-                self.Loss += loss_predict
+                self.Loss1 += loss_predict1
+                self.Loss2 += loss_predict2
+                self.Loss3 += loss_predict3
                 # clear gradient 
                 self.net.zero_grad()
                 
     def fulltrain(self, lr_rate = 1e-4, decay = 1e-6, trials = 100, low = 10, high = 100, batchsize = 4, size_range = np.arange(10, 20, 1), beta = 1e-2):
-        self.Loss = 0
+        self.Loss1 = 0
+        self.Loss2 = 0
+        self.Loss3 = 0
         # start to experiment
         for i in range(trials):
             Actions, Inputs, Targets = self.experiment(low = low, high = high, batchsize = batchsize, size_range = size_range)
             self.train(lr_rate, Actions, Inputs, Targets, decay = decay, beta = beta)
             if i%50 == 0 and i>0:
-                print ('loss for epoch:', self.Loss)
+                print ('loss for epoch:', self.Loss1, self.Loss2, self.Loss3)
                 self.Loss = 0       
 
 

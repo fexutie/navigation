@@ -37,7 +37,7 @@ warnings.filterwarnings('ignore')
 
 Pretest =  PretrainTest(weight_write = 'weights_cpu/rnn_1515tanh512_checkpoint', holes = 0)
 
-for i in range(40):
+for i in range(400):
     Pretest.pretrain(i, pretrain = (i!=0), lr = 1e-5)
     net = Pretest.pregame.net.cpu()
     torch.save(net.state_dict(), 'weights_cpu/rnn_1515tanh512_checkpoint{}'.format(i))
