@@ -33,7 +33,6 @@ class ValueMaxGame(Game):
         # need to have randomness
         self.e = e
         self.net = RNN(9, 512, 4, k_action = 1)
-        self.decoder = decoder(512, self.grid_size[0] + self.grid_size[1] + 8)
         self.hidden = self.net.initHidden()
         self.action = self.net.initAction()
         self.Loss = 0
@@ -46,21 +45,22 @@ class ValueMaxGame(Game):
         self.Qs = []
         self.Pos = []
         self.time_limit = time_limit
-        self.max_size = 20
         # running avearage rate
         self.alpha = alpha
         # backward ratio   
         self.lam = lam
+        self.gain_stim = 1
+        self.gain_context = 0.1
         self.succeed = 0
         self.life = 0
         self.y_mid = 0
         self.x_mid = 0
-        if len(set_reward) != 0:
-            for i in range(len(set_reward)):
-                self.y_mid += self.set_reward[i][0] 
-                self.x_mid += self.set_reward[i][1] 
-            self.y_mid /= len(set_reward)
-            self.x_mid /= len(set_reward)
+        for i in range(len(set_reward)):
+            self.y_mid += self.set_reward[i][0] 
+            self.x_mid += self.set_reward[i][1] 
+        self.y_mid /= len(set_reward)
+        self.x_mid /= len(set_reward)
+       # self.conv1 = nn.Conv2d(1,1,3)
            
     def sample(self):
         # choose between 0, 1,2,3
@@ -80,47 +80,29 @@ class ValueMaxGame(Game):
                 field[k, i] =  (i- pos_relative) ** 2 
 #                 print (i - pos[k])e
         # gaussian density, but before exponential to help learning identity mapping input to output
-        field = - 0.1 * torch.from_numpy(field).resize(1, 2 * 19).float()
+        field = - self.gain_context  * torch.from_numpy(field).resize(1, 2 * 19).float()
         return field
-    
-#     def placefield_decode(self, pos): 
-#         field =np.zeros((2, self.max_size + 4))
-#         for k in range(2):
-#             for i in range(field.shape[1]): 
-#             # distance generation 
-#                 field[k, i] =  (i- self.agent.pos[k]) ** 2 
-#         # gaussian density, but before exponential to help learning identity mapping input to output
-#         field = - 0.1 * torch.from_numpy(field).resize(1, 2 * (self.max_size + 4)).float()
-#         return field 
     
     def maxplay(self, state, cross = False):
         # Move according to action: 0=UP, 1=RIGHT, 2=DOWN, 3=LEFT
         # value for four action     
         action0 = self.action.clone()
         if cross == False: 
-            self.values, self.hidden = self.net(state, self.hidden, self.action, self.placefield(self.pos_reward))
+            self.values, self.hidden = self.net(self.gain_stim * state, self.hidden, self.action, self.placefield(self.pos_reward))
         else:
-            self.values, self.hidden = self.net(state, self.hidden, self.action, self.placefield(self.pos_reward_))
+            self.values, self.hidden = self.net(self.gain_stim * state, self.hidden, self.action, self.placefield(self.pos_reward))
         action = self.values.data.cpu().numpy().argmax()
         # action to state
         if np.random.random()< self.e:
             action = self.sample()
         self.action = torch.eye(4)[action].resize(1, 4)
         return action, action0  
-#  decode is binary  by rls regressor
+#  decode is binary  
     def decode(self):
         pos = self.hidden.matmul(self.net.h2p_rls) + self.net.bp_rls
         return pos  
-    
-# decode by sgd classifier
-    def decode_sgd(self):
-        Pos_p = self.hidden.matmul(self.decoder.h2p).data.numpy()  + self.decoder.bp.data.numpy()
-        yp = np.array([np.argmax(p[:19]) for p in Pos_p])
-        xp = np.array([np.argmax(p[19:]) for p in Pos_p]) 
-        return (yp, xp)
-
     # test is for testing phase, decode is to train decoder   
-    def step(self, policy, epsilon = 'default', record = False, test = False, cross = False, train_hidden = False, decode = False, start = False):
+    def step(self, policy, epsilon = 'default', record = False, test = False, cross = False, train_hidden = False, decode = False):
         if epsilon != 'default': 
             self.e = epsilon  
         self.t += 1
@@ -158,7 +140,7 @@ class ValueMaxGame(Game):
         reward, done = rewarding()
         # update value function
         def TD(decode = False):
-            realQ,_  = self.net(Variable(torch.FloatTensor(state_t1)).resize(1,9), self.hidden, self.action, self.placefield(self.pos_reward))
+            realQ,_  = self.net(self.gain_stim * Variable(torch.FloatTensor(state_t1)).resize(1,9), self.hidden, self.action, self.placefield(self.pos_reward))
             # target Q is for state before updated, it only needs to update the value assocate with action taken
             targetQ = self.values.clone().detach()
             # new Q attached with the new state 
@@ -187,25 +169,22 @@ class ValueMaxGame(Game):
         if test == False:
             TD()
         # record position and hidden state 
-        self.Hiddens.append(self.hidden.detach())
+        self.Hiddens.append(self.hidden.clone())
         if train_hidden == True:
-            self.Pos.append(self.placefield(self.agent.pos))
+            self.Pos.append(self.placefield())
         elif decode == True:
             self.Pos.append(torch.FloatTensor([pos0[0], pos0[1]]).resize(1, 2))
         return pos0, state_t0, reward, done
     
         # suppose walk in an empty room    
-    def step_empty(self, stim = torch.zeros(1, 9), action_ = 0, epsilon = 'default', T0 = 100, T = 400, time_stop = 60, open_loop = True):
+    def step_empty(self, stim = torch.zeros(1, 9), action_ = 0, epsilon = 'default', open_loop = True, context = torch.zeros(1, 38)):
         self.t += 1
         # set e in any case 
         if epsilon !=  'default':
             self.e = epsilon
-        if self.t < T0+time_stop and self.t>T0:
-            state = stim
-        else:
-            state = torch.zeros(1, 9)
-        pos_reward = self.set_reward[0]
-        self.values, self.hidden = self.net(torch.FloatTensor(state).resize(1, 9), self.hidden, self.action, self.placefield(pos_reward))
+        state = stim  
+        pos_reward = self.Set_reward[0]
+        self.values, self.hidden = self.net(torch.FloatTensor(state).resize(1, 9), self.hidden, self.action, context)
         action = self.values.data.cpu().numpy().argmax()
         if random.random()< self.e:
             action = self.sample()
@@ -213,11 +192,7 @@ class ValueMaxGame(Game):
             self.action = torch.eye(4)[action_].resize(1, 4)
         else:
             self.action = torch.eye(4)[action].resize(1, 4)
-        if self.t > T:
-            done = True 
-        else:
-            done = False
-        return done, action 
+        return action 
     
     
     def episode(self, epochs = 10, epsilon = 'default', reward_control = None, size_range = (10, 20), prob = 5 * [0.2], train_hidden = False, test = False, decode = False):   
@@ -237,7 +212,8 @@ class ValueMaxGame(Game):
             # data record
             self.Hiddens_batch.extend(self.Hiddens)
             self.Targets_batch.extend(self.Qs)
-            self.Pos_batch.extend(self.Pos)
+            if decode == True:
+                self.Pos_batch.extend(self.Pos)
             self.trace = []
             self.Qs = []
             self.Hiddens = []
@@ -253,14 +229,10 @@ class ValueMaxGame(Game):
 #         print('start episode', process.memory_info().rss) 
         for i in range(epochs):
             k += 1
-            start = False
             for t in range(self.size * 10):
-                _, state_t0, reward, done = self.step(self.maxplay, epsilon = epsilon, train_hidden = train_hidden, test = test, decode = decode, start = start)
-                if np.sum(state_t0) != 0:
-                    start = True  
+                _, state_t0, reward, done = self.step(self.maxplay, epsilon = epsilon, train_hidden = train_hidden, test = test, decode = decode)
                 if done == True:
                     Done()
-#                     start = False
             Done()
 
 
@@ -289,31 +261,6 @@ class ValueMaxGame(Game):
         self.net.h2p_rls.data = rls.beta[:-1]
         self.net.bp_rls.data = rls.beta[-1].resize(1, 2)
         
-    def train_sgd(self, control = 0, lr_rate = 1e-3, batch_size = 4):
-        hiddens = torch.stack(self.Hiddens_batch).view(len(self.Hiddens_batch), -1)
-        poss = torch.stack(self.Pos_batch).squeeze()
-        data = [(h, p) for h, p in zip(hiddens, poss)]
-        trainloader = torch.utils.data.DataLoader(data, batch_size = batch_size)
-        optimizer = torch.optim.Adam(
-                [ 
-                {'params': self.decoder.h2p, 'lr': lr_rate, 'weight_decay':0},
-                {'params': self.decoder.bp, 'lr': lr_rate, 'weight_decay':0},
-                ]
-        )
-        # for a number of iterations, do gradient descent   
-        for k in range(50):
-            for i, data in enumerate(trainloader, 0):  
-                hidden, labels = data
-                predicts = self.decoder(hidden)
-#                 print (predicts.size(), labels.size())
-                # cross entropy of mini batch
-                loss = self.net.crossentropy(predicts, labels, labels.size()[0])
-                loss.backward(retain_graph = True)
-                optimizer.step()
-                self.Loss += loss
-#                 print (loss)
-                self.decoder.zero_grad()
-        
     def experiment(self, rls_q, rls_sl, iterations = 10, epochs = 20, epsilon = 0.5, num_episodes = 100, reward_control = None, train_hidden = False, train_q = True, decode = False, size_range = [10], test = False):
         # initialize, might take data during test
         self.trace = []
@@ -331,46 +278,24 @@ class ValueMaxGame(Game):
             self.Pos_batch = []
         process = psutil.Process(os.getpid())
         print('clear session data', i, process.memory_info().rss) 
-        
-    # train classifer type of decoder     
-    def experiment_decode(self, iterations = 10, epochs = 10, epsilon = 0.0, reward_control = 0, size_range = [15]):
-        # initialize, might take data during test
-        self.trace = []
-        self.Qs = []
-        self.Hiddens = []
-        self.Pos = []
-        for i in range(iterations):
-            # store the place information in vector format, so train hidden = true   
-            self.episode(epochs = epochs, epsilon = epsilon, reward_control = reward_control, size_range = size_range, prob = np.ones(len(size_range))/len(size_range), train_hidden = True, test = True, decode = False)
-            self.train_sgd(control = reward_control)
-            self.Hiddens_batch = []
-            self.Targets_batch = []
-            self.Pos_batch = []
-            if i%1 == 0:
-                print ('loss', self.Loss)
-                self.Loss = 0
     
 
-def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test = 1, limit_set = 2, matrix = False):
+def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test = 1, limit_set = 2):
     if weights != 0: 
         game.net.load_state_dict(torch.load(weights))
     Rewards = 0
     iters = 0
     error = 0
     step = size//15 + 1
-    Rewards_matrix = []
     for j in np.arange (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
         for i in np.arange (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
             game.reset(set_agent = (j,i), reward_control = reward_control, size = size, limit_set = limit_set, test = test)
 
             done = False
             game.hidden = game.net.initHidden()
-            pos_r = game.Set_reward[game.reward_control]
-            y, x = pos_r
-            pos_r = (2 * VISIBLE_RADIUS + int(game.grid_size[0] * y), 2 * VISIBLE_RADIUS + int(game.grid_size[1] * x))
+            pos_r = game.set_reward[game.reward_control]
             while not done:
                 _, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test = True, cross = cross) # Down
-            # suppose goes up, and return to reward in middle and goe left 
             if i<=pos_r[1]:
                 path_optimal = np.abs(2 * VISIBLE_RADIUS - j) + np.abs(pos_r[0] - 2 * VISIBLE_RADIUS) + np.abs(pos_r[1] - i)
             if i>pos_r[1]:
@@ -382,58 +307,91 @@ def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test
                     reward = 1
             else:
                 reward = reward
-#             reward = 0.5 * (reward + 1)
-            Rewards_matrix.append(reward)
             Rewards += reward
-#             print (path_optimal, game.t, pos_r)
+#             print (path_optimal/game.t)
             iters += 1
     game.Qs = []
     game.Hiddens = []
     game.Pos = []
-    if matrix == False:
-        return Rewards/(iters)
-    else:
-        return Rewards/(iters), Rewards_matrix 
+    return Rewards/(iters)
 
 
-def decodetest(game, weights = 0, epsilon = 0, reward_control = [0], size = 15, sgd = False):
+def Test_scaling(game, weights = 0, reward_control = [0], cross = False, size = 15, test = 1, limit_set = 2):
+    if weights != 0: 
+        game.net.load_state_dict(torch.load(weights))
+    Rewards = 0
+    iters = 0
+    error = 0
+    step = size//15 + 1
+    for j in np.arange (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+        for i in np.arange (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+            game.reset(set_agent = (j,i), reward_control = reward_control, size = size, limit_set = limit_set, test = test)
+
+            done = False
+            game.hidden = game.net.initHidden()
+            pos_r = game.set_reward[game.reward_control]
+            while not done:
+                _, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test = True, cross = cross) # Down
+            if reward <= 0:
+                reward = 0
+            Rewards += reward
+#             print (path_optimal/game.t)
+            iters += 1
+    game.Qs = []
+    game.Hiddens = []
+    game.Pos = []
+    return Rewards/(iters)
+
+
+def decodetest(game, weights = 0, epsilon = 0, reward_control = [0], trial = (0, 0), plot = False, size = 15):
     if weights != 0: 
         game.net.load_state_dict(torch.load(weights))
     # for the decoding upon each location 
     decodes = np.ones((size + 4, size + 4)) * 0
-    visit = np.ones((size + 4, size + 4)) * 1e-5
+    visit = np.ones((size + 4, size + 4)) * 0
     step = 1
     Dist = []
     for j in range (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
         for i in range (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
-            game.reset(set_agent = (j, i), reward_control = reward_control, size = size)
+            if trial != (0, 0):
+                game.reset(set_agent = trial, reward_control = reward_control, size = size)
+            else:
+                game.reset(set_agent = (j, i), reward_control = reward_control, size = size)
             done = False
             start = 0
             game.hidden = game.net.initHidden()
-            Y, X, Yp, Xp = [], [], [], []
             while not done:
                 # not let the data to accumulate by TD, so test = true
                 pos0, state, reward, done  = game.step(game.maxplay, epsilon = epsilon, test = True) # Down
-                if sgd == False:
-                    pos = game.decode()
-                    y, x =  pos.data.numpy()[0]
-                else:
-                    pos = game.decode_sgd()
-                    y, x = pos
-                Y.append(pos0[0])
-                X.append(pos0[1])
-                Yp.append(y)
-                Xp.append(x)
                 # start only when there is visual stimulus 
                 if np.sum(state) != 0:
                     start = 1
                 # count manhaton distance between real and predicted 
                 if start == 1:
+                    pos = game.decode()
     #                     print (pos.data.numpy()[0], game.agent.pos[0])
-                    manhantondist = np.abs((y - pos0[0])) + np.abs((x - pos0[1]))
-                    decodes[pos0] += manhantondist
+                    manhantondist = np.abs((pos.data.numpy()[0][0] - pos0[0])) + \
+                    np.abs((pos.data.numpy()[0][1] - pos0[1]))
+                    decodes[pos0] += 0.5 * manhantondist
                     visit[pos0] += 1
                     Dist.append(manhantondist)
+                # plot only if true 
+                if plot == True and start == 1: 
+                    plt.figure(0)
+                    plt.scatter(pos0[0], pos.data.numpy()[0][0], color = 'r')
+                    plt.plot(np.arange(19), np.arange(19), 'k--')
+                    plt.xlabel('real y', size = 20)
+                    plt.ylabel('predict y', size = 20)
+    #                 plt.xlim(0, 15)
+    #                 plt.ylim(0, 15)
+                    plt.figure(1)
+                    plt.scatter(pos0[1], pos.data.numpy()[0][1], color = 'r')
+                    plt.plot(np.arange(19), np.arange(19), 'k--')
+                    plt.xlabel('real x', size = 20)
+                    plt.ylabel('predict x', size = 20)
+#                 print (pos.data.numpy()[0][0], pos0[0])
+            if trial != (0, 0):
+                break
             game.Qs = []
             game.Hiddens = []
             game.Pos = []

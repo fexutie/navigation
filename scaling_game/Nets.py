@@ -116,12 +116,12 @@ class PretrainTest():
     
         
     def qlearn(self, weight_read, weight_write, iterations = 5, save = True, size_train = np.arange(10, 51, 10), \
-               size_test = [10, 30], train_only = False, test_only = False, noise = 0.3, lam = 0.5, h2o = True):
+               size_test = [10, 30], train_only = False, test_only = False, noise = 0.3, h2o = True):
         self.game.net.load_state_dict(torch.load(weight_read))
         if h2o == True:
             self.game.net.h2o = nn.Parameter(torch.randn(512, 4) * 0.01 * np.sqrt(2.0/(512 + 4)))
         e_rate = [noise for r in range(iterations)] 
-        rls_q = RLS(1e2, lam = lam)
+        rls_q = RLS(1e2)
         rls_sl = RLS(1e2)
         Rewards = []
         # q leanring phase
@@ -129,7 +129,7 @@ class PretrainTest():
             prob = np.ones(len(size_train)) 
             prob = prob/np.sum(prob)
             if test_only == False:
-                self.game.experiment(rls_q, rls_sl, iterations = 20, epochs= 30, epsilon = e, size_range = size_train)    
+                self.game.experiment(rls_q, rls_sl, iterations = 50, epochs= 10, epsilon = e, size_range = size_train)    
                 if save == True:
                     torch.save(self.game.net.state_dict(), weight_write + '_{}'.format(n))
             def testing(game):
@@ -152,7 +152,7 @@ class PretrainTest():
             Rewards.append(rewards)
         return Rewards
     
-    def TestAllSizes(self, size_range = np.arange(15, 86, 10), limit_set = 8, test_size = None, cross  = False):
+    def TestAllSizes(self, size_range = np.arange(15, 86, 10), limit_set = 8, test_size = None, cross  = False, scaling = False):
         self.game.net.load_state_dict(torch.load(self.weight))
         self.Performance = []
         for size in size_range:
@@ -160,8 +160,12 @@ class PretrainTest():
                 test_size = size//25
             else:
                 test_size = test_size
-            Rewards0 = Test(self.game, reward_control = 0, size = size, test = test_size, limit_set = limit_set, cross = cross)
-            Rewards1 = Test(self.game, reward_control = 1, size = size, test = test_size, limit_set = limit_set, cross = cross)
+            if scaling == False:
+                Rewards0 = Test(self.game, reward_control = 0, size = size, test = test_size, limit_set = limit_set, cross = cross)
+                Rewards1 = Test(self.game, reward_control = 1, size = size, test = test_size, limit_set = limit_set, cross = cross)
+            else:
+                Rewards0 = Test_scaling(self.game, reward_control = 0, size = size, test = test_size, limit_set = limit_set, cross = cross)
+                Rewards1 = Test_scaling(self.game, reward_control = 1, size = size, test = test_size, limit_set = limit_set, cross = cross)
             self.Performance.append((Rewards0 + Rewards1)/2)
 
 # attention to noise level, here corresponed to pretraining , so set noise to 1 
