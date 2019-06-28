@@ -144,7 +144,7 @@ class Game():
         self.holes = holes
         self.input_type = input_type
     # set limit sizes 
-    def reset(self, set_agent = 0, action = True, reward_control = 0, size = None, size_range = np.arange(10, 51, 10), prob = 5 * [0.2] , limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = []):
+    def reset(self, set_agent = 0, action = True, reward_control = 0, size = None, size_range = np.arange(10, 51, 10), prob = 5 * [0.2] , limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = [], scale = None):
         """Start a new episode by resetting grid and agent"""
         # reset the reward so that it will not be erased in time 
         # set size
@@ -159,7 +159,12 @@ class Game():
             radius = self.size//10 - 1
             if test!= None:
                 radius = test
-            k = np.random.randint(1, 4)
+            if train == True:
+                k = np.random.randint(1, 4)
+            elif scale != None:
+                k = scale
+            else:
+                k = np.random.randint(1, 4)
             self.time_limit = int(k * self.size * limit_set)
             self.Set_reward = []
             for pos in self.set_reward:
