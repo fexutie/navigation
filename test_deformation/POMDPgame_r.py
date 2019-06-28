@@ -156,11 +156,11 @@ class Game():
         self.size = size
         # set reward
         if len(self.set_reward) != 0:
-            self.time_limit = int(self.size * limit_set)
             radius = self.size//10 - 1
             if test!= None:
                 radius = test
             k = np.random.randint(1, 4)
+            self.time_limit = int(k * self.size * limit_set)
             self.Set_reward = []
             for pos in self.set_reward:
                 y, x = pos
