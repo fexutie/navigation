@@ -290,7 +290,7 @@ class ValueMaxGame(Game):
         print('clear session data', i, process.memory_info().rss) 
     
 
-def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test = 1, limit_set = 2, map_set = [], start = []):
+def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test = 1, limit_set = 2, map_set = [], start = [], scale = 1):
     if weights != 0: 
         game.net.load_state_dict(torch.load(weights))
     Rewards = 0
@@ -310,17 +310,15 @@ def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test
             pos_r = game.Set_reward[game.reward_control]
             while not done:
                 _, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test = True, cross = cross) # Down
-            if i<=pos_r[1]:
-                path_optimal = np.abs(2 * VISIBLE_RADIUS - j) + np.abs(pos_r[0] - 2 * VISIBLE_RADIUS) + np.abs(pos_r[1] - i)
-            if i>pos_r[1]:
-                path_optimal = np.abs(2 * VISIBLE_RADIUS - j) + np.abs(pos_r[0] - 2 * VISIBLE_RADIUS) + np.abs(game.grid_size[0]+1 - i)\
-                + np.abs(pos_r[1] - (game.grid_size[1]+1))
+            # if i<=pos_r[1]:
+            #     path_optimal = np.abs(2 * VISIBLE_RADIUS - j) + np.abs(pos_r[0] - 2 * VISIBLE_RADIUS) + np.abs(pos_r[1] - i)
+            # if i>pos_r[1]:
+            #     path_optimal = np.abs(2 * VISIBLE_RADIUS - j) + np.abs(pos_r[0] - 2 * VISIBLE_RADIUS) + np.abs(game.grid_size[0]+1 - i)\
+            #     + np.abs(pos_r[1] - (game.grid_size[1]+1))
             if reward == 1:
-                reward = path_optimal/game.t
-                if reward >=1:
-                    reward = 1
-            else:
-                reward = reward
+                reward = 1
+            elif reward == -1:
+                reward = 0
             Rewards += reward
 #             print (path_optimal/game.t)
             iters += 1
