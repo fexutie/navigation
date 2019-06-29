@@ -183,7 +183,7 @@ class PretrainTest():
             rls_q.lam = lam
         return Rewards
     
-    def TestAllSizes(self, size_range = np.arange(15, 86, 10), limit_set = 8, test_size = None, grid = [], start = []):
+    def TestAllSizes(self, size_range = np.arange(15, 86, 10), limit_set = 8, test_size = None, grid = [], start = [], scale = 1):
         self.game.net.load_state_dict(torch.load(self.weight))
         self.Performance = []
         for size in size_range:
@@ -191,8 +191,8 @@ class PretrainTest():
                 test_size = size//25
             else:
                 test_size = test_size
-            Rewards0 = Test(self.game, reward_control = 0, size = size, test = test_size, limit_set = limit_set, map_set = grid, start = start)
-            Rewards1 = Test(self.game, reward_control = 1, size = size, test = test_size, limit_set = limit_set, map_set = grid, start = start)
+            Rewards0 = Test(self.game, reward_control = 0, size = size, test = test_size, limit_set = limit_set, map_set = grid, start = start, scale = scale)
+            Rewards1 = Test(self.game, reward_control = 1, size = size, test = test_size, limit_set = limit_set, map_set = grid, start = start, scale = scale)
             self.Performance.append((Rewards0 + Rewards1)/2)
 
 
