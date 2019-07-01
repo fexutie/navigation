@@ -6,5 +6,6 @@ contains:
 3, compare with pretrained network glm     
 
 dependency: 
+
 Dynamics analysis  
 Echo info   
