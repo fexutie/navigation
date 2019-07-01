@@ -121,3 +121,19 @@ States, Poss, Hiddens, Actions, Status, Context = Transform(States, Poss, Hidden
 X = np.array(Hiddens[Status>1])
 Y = Status[Status>1]
 score = cross_validate(model, X,Y, cv = 5)
+
+# plot
+test_echo = score0['test_score']
+test_pre2 = score['test_score']
+test_pos = score_pos['test_score']
+
+ax = subplot(1, 1, 1)
+ax.spines['top'].set_visible(False)
+ax.spines['right'].set_visible(False)
+
+barlist = plt.bar(np.arange(3), height = [np.mean(test_echo), np.mean(test_pos), np.mean(test_pre2)], yerr =  [np.std(test_echo), np.std(test_pos), np.std(test_pre2)])
+barlist[0].set_color('b')
+barlist[1].set_color('r')
+barlist[2].set_color('g')
+plt.xticks([0, 1, 2], ['echo', 'PosNet', 'MemNet'], size = 15)
+plt.yticks([0, 0.5, 1], size = 15)
