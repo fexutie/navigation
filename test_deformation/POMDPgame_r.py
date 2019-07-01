@@ -85,7 +85,7 @@ class Grid():
     
     
 class Agent():
-    def reset(self, grid_size, set_agent = 0):
+    def reset(self, grid, grid_size, set_agent = 0):
         if type(grid_size) == tuple:
             self.grid_size_y,  self.grid_size_x = grid_size
         else:
@@ -93,7 +93,11 @@ class Agent():
         # position initialize
         if set_agent == 0:
             random.seed()
-            self.pos = (np.random.randint(self.grid_size_y) + 2*VISIBLE_RADIUS, np.random.randint(self.grid_size_x) + 2*VISIBLE_RADIUS)
+            poss = list(np.argwhere(grid.grid == 0))
+            # poss = [tuple(pos) for pos in poss]
+            # print (poss)
+            index = np.random.choice(len(poss), p = len(poss) * [1/len(poss)])
+            self.pos = poss[index]
         else : 
             self.pos = set_agent
         
@@ -185,7 +189,7 @@ class Game():
             self.grid.grid[np.where(self.grid.grid == 1)] = 0
             self.pos_reward = (2 * VISIBLE_RADIUS + int(self.size * y), 2 * VISIBLE_RADIUS + int(self.size * x))
         # set position 
-        self.agent.reset(self.grid_size, set_agent = set_agent)
+        self.agent.reset(self.grid, self.grid_size, set_agent = set_agent)
         self.hidden = self.net.initHidden()
         if action == True:
             self.action = self.net.initAction()
