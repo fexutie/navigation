@@ -6,5 +6,5 @@ Contains:
 3   shortcut test
 4,  scaling task  evolution & generalization 
 Depends on: 
-1,  test bar/shortcut in for posnet1, memnet and echo  net  
-2,  test scaling on three networks performance summary
+1,  test bar/shortcut in for posnet1, memnet and echo net.
+2,  test scaling on three networks performance summary.  
