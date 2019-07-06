@@ -45,18 +45,23 @@ class PretrainTest():
         
 
     # make the shuffled one instead of removing them, try to see what is the given effect  
-    def weight_lowrank(self, trial = 39, rank = 0, descend = True):
+    def weight_lowrank(self, trial = 39, rank = 0, descend = True, rm_remove = False):
         W0 = torch.load('weights_cpu1/rnn_1515tanh512_checkpoint0')['h2h'].data.numpy()
         Wt = torch.load('weights_cpu1/rnn_1515tanh512_checkpoint{}'.format(trial))['h2h'].data.numpy()
+        # decomposition
         u, s, vh = np.linalg.svd(Wt - W0)
         smat = np.zeros_like(np.diag(s))
+        # truncated first r ranks
         smat[:rank, :rank] = np.diag(s)[:rank, :rank]
+        # recontruct the low rank part
         Wper = np.dot(smat, vh)
         Wper = np.dot(u, Wper)
         if descend == True:
             W = Wt - Wper + np.random.permutation(Wper).reshape(Wper.shape[0], Wper.shape[1])
         else:
-            W = W0 +  Wper
+            W = W0 +  Wperr
+        if rm_remove == True:
+            W = Wper   
         h2h = torch.from_numpy(W)
         self.game.net.h2h = nn.Parameter(h2h)
         print ('norm', np.linalg.norm(Wper))
