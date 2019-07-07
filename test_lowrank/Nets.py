@@ -45,9 +45,10 @@ class PretrainTest():
         
 
     # make the shuffled one instead of removing them, try to see what is the given effect  
-    def weight_lowrank(self, trial = 39, rank = 0, descend = True, rm_remove = False):
-        W0 = torch.load('weights_cpu1/rnn_1515tanh512_checkpoint0')['h2h'].data.numpy()
-        Wt = torch.load('weights_cpu1/rnn_1515tanh512_checkpoint{}'.format(trial))['h2h'].data.numpy()
+    def weight_lowrank(self, trial = 300, rank = 0, descend = True, rm_remove = False):
+        # read initial and learned weight
+        W0 = torch.load('weights_cpu/rnn_1515tanh512_checkpoint0')['h2h'].data.numpy()
+        Wt = torch.load('weights_cpu/rnn_1515tanh512_checkpoint{}'.format(trial))['h2h'].data.numpy()
         # decomposition
         u, s, vh = np.linalg.svd(Wt - W0)
         smat = np.zeros_like(np.diag(s))
@@ -65,6 +66,8 @@ class PretrainTest():
         h2h = torch.from_numpy(W)
         self.game.net.h2h = nn.Parameter(h2h)
         print ('norm', np.linalg.norm(Wper))
+        if rm_remove == True:
+                print ('norm', np.linalg.norm(self.game.net.h2h.data.numpy()))
        
             
     def loadweight(self, weight_load):
@@ -119,12 +122,11 @@ class PretrainTest():
         # q learning session 
     
         
-    def qlearn(self, weight_read, weight_write, iterations = 5, save = True, size_train = np.arange(10, 51, 10), \
-               size_test = [10, 30], train_only = False, \
-               test_only = False, noise = 0.3, h2o = True, k_action = 1, lowrank = False):
+    def qlearn(self, weight_read, weight_write, iterations = 5, trial = 300, save = True, size_train = np.arange(10, 51, 10), \
+               size_test = [10, 30], train_only = False, test_only = False, noise = 0.3, h2o = True, k_action = 1, lowrank = False, rm_remove = False):
         self.game.net.load_state_dict(torch.load(weight_read))
         if lowrank != False:
-            self.weight_lowrank(rank = lowrank)
+            self.weight_lowrank(rank = lowrank, rm_remove = rm_remove, trial = trial)
         self.game.net.k_action = k_action
         if h2o == True:
             self.game.net.h2o = nn.Parameter(torch.randn(512, 4) * 0.01 * np.sqrt(2.0/(512 + 4)))

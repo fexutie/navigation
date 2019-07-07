@@ -50,22 +50,30 @@ def weight_lowrank0(net, trial = 39, rank = 0, descend = True):
     print ('norm', np.linalg.norm(Wper))
     
     
-def weight_lowrank(net, trial = 39, ranks = [], descend = True):
-    W0 = torch.load('weights_cpu1/rnn_1515tanh512_checkpoint0')['h2h'].data.numpy()
-    Wt = torch.load('weights_cpu1/rnn_1515tanh512_checkpoint{}'.format(trial))['h2h'].data.numpy()
-    u, s, vh = np.linalg.svd(Wt - W0)
-    smat = np.zeros_like(np.diag(s))
-    for rank in ranks:
-        smat[rank, rank] = np.diag(s)[rank, rank]
-    Wper = np.dot(smat, vh)
-    Wper = np.dot(u, Wper)
-    if descend == True:
-        W = Wt - Wper + np.random.permutation(Wper).reshape(Wper.shape[0], Wper.shape[1])
-    else:
-        W = W0 +  Wper
-    h2h = torch.from_numpy(W)
-    net.h2h = nn.Parameter(h2h)
-    print ('norm', np.linalg.norm(Wper))
+ # make the shuffled one instead of removing them, try to see what is the given effect  
+def weight_lowrank(net, trial = 300, rank = 0, descend = True, rm_remove = False):
+        # read initial and learned weight
+        W0 = torch.load('weights_cpu/rnn_1515tanh512_checkpoint0')['h2h'].data.numpy()
+        Wt = torch.load('weights_cpu/rnn_1515tanh512_checkpoint{}'.format(trial))['h2h'].data.numpy()
+        # decomposition
+        u, s, vh = np.linalg.svd(Wt - W0)
+        smat = np.zeros_like(np.diag(s))
+        # truncated first r ranks
+        smat[:rank, :rank] = np.diag(s)[:rank, :rank]
+        # recontruct the low rank part
+        Wper = np.dot(smat, vh)
+        Wper = np.dot(u, Wper)
+        if descend == True:
+            W = Wt - Wper + np.random.permutation(Wper).reshape(Wper.shape[0], Wper.shape[1])
+        else:
+            W = W0 +  Wperr
+        if rm_remove == True:
+            W = Wper   
+        h2h = torch.from_numpy(W)
+        net.h2h = nn.Parameter(h2h)
+        print ('norm', np.linalg.norm(Wper))
+        if rm_remove == True:
+                print ('norm', np.linalg.norm(net.h2h.data.numpy()))   
 
 
 
@@ -94,7 +102,7 @@ def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torc
         hidden0 = game.hidden.clone()
     return Pos, np.array(Hidden), np.array(dH), np.array(Action), np.array(State), reward
 
-def trajectory_empty(pos0, game, Stim, reward_control = 0, action_ = [], e = 0, open_loop = True, init_hidden = True, hidden = torch.zeros(512, 512)):
+def trajectory_empty(pos0, game, Stim, reward_control = 0, action_ = [], e = 0, open_loop = True, init_hidden = True, hidden = torch.zeros(512, 512), context = torch.zeros(1, 38)):
     game.reset(reward_control = reward_control, size = 15)
     done = False
     if init_hidden == True:
@@ -115,9 +123,9 @@ def trajectory_empty(pos0, game, Stim, reward_control = 0, action_ = [], e = 0, 
     action = action_
     for stim in Stim:
         if open_loop == True:
-            done, action = game.step_empty(stim = stim, action_ = action_, epsilon = e, open_loop = open_loop) # Down
+            action = game.step_empty(stim = stim, action_ = action_, epsilon = e, open_loop = open_loop, context = context) # Down
         else:
-            done, action = game.step_empty(stim = stim, action_ = action, epsilon = e, open_loop = open_loop) # Down
+            action = game.step_empty(stim = stim, action_ = action, epsilon = e, open_loop = open_loop, context = context) # Down
         # up 
         if action == 0: y -= 1
         # right
@@ -187,9 +195,9 @@ class PCA():
                             self.game.reset(reward_control = self.reward_control, size = self.size)
                             done = False 
     # put every row(time) together into one long trajectory, which means concatenation along rows - number of neurons
-    def pca(self, T_duration = None, lowrank = [], descend = True):
+    def pca(self, T_duration = None, lowrank = [], descend = True, rm_remove = False):
         if lowrank != []:
-            weight_lowrank(self.game.net, ranks = lowrank, descend = descend)
+            weight_lowrank(self.game.net, rank = lowrank, descend = descend, rm_remove = rm_remove)
         if T_duration == None:
             T_duration = self.size * 4
         self.record(T_duration = T_duration)
