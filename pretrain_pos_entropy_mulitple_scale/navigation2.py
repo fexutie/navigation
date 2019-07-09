@@ -55,6 +55,7 @@ class ValueMaxGame(Game):
         self.life = 0
         self.y_mid = 0
         self.x_mid = 0
+        self.pos_reward = (9, 5)
         for i in range(len(set_reward)):
             self.y_mid += self.set_reward[i][0] 
             self.x_mid += self.set_reward[i][1] 
@@ -96,6 +97,16 @@ class ValueMaxGame(Game):
             action = self.sample()
         self.action = torch.eye(4)[action].resize(1, 4)
         return action, action0  
+    # speed of dynamics 
+    def velocity(self, stim = torch.zeros(1, 9), hidden0 = torch.randn(1, 512, requires_grad = True), action = 4):
+        # Move according to action: 0=UP, 1=RIGHT, 2=DOWN, 3=LEFT
+        # value for four action  
+        if action<=3:
+            self.action = torch.eye(4)[action].resize(1, 4)
+        else:
+            self.action = 0.25 * torch.ones(4).resize(1, 4)
+        velocity = self.net.velocity(stim, hidden0, self.action, self.placefield(self.pos_reward))
+        return velocity 
 #  decode is binary  
     def decode(self):
         pos = self.hidden.matmul(self.net.h2p_rls) + self.net.bp_rls
@@ -188,7 +199,10 @@ class ValueMaxGame(Game):
         if random.random()< self.e:
             action = self.sample()
         if open_loop == True:
-            self.action = torch.eye(4)[action_].resize(1, 4)
+            if action_ <4:
+                self.action = torch.eye(4)[action_].resize(1, 4)
+            else: 
+                self.action = 0.25 * torch.ones(4).resize(1, 4)
         else:
             self.action = torch.eye(4)[action].resize(1, 4)
         return action 
@@ -292,7 +306,7 @@ def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test
 
             done = False
             game.hidden = game.net.initHidden()
-            pos_r = game.set_reward[game.reward_control]
+            pos_r = game.Set_reward[game.reward_control]
             while not done:
                 _, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test = True, cross = cross) # Down
             if i<=pos_r[1]:
@@ -306,6 +320,32 @@ def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test
                     reward = 1
             else:
                 reward = reward
+            Rewards += reward
+#             print (path_optimal/game.t)
+            iters += 1
+    game.Qs = []
+    game.Hiddens = []
+    game.Pos = []
+    return Rewards/(iters)
+
+def Test_scaling(game, weights = 0, reward_control = [0], cross = False, size = 15, test = 1, limit_set = 2):
+    if weights != 0: 
+        game.net.load_state_dict(torch.load(weights))
+    Rewards = 0
+    iters = 0
+    error = 0
+    step = size//15 + 1
+    for j in np.arange (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+        for i in np.arange (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+            game.reset(set_agent = (j,i), reward_control = reward_control, size = size, limit_set = limit_set, test = test)
+
+            done = False
+            game.hidden = game.net.initHidden()
+            pos_r = game.set_reward[game.reward_control]
+            while not done:
+                _, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test = True, cross = cross) # Down
+            if reward <= 0:
+                reward = 0
             Rewards += reward
 #             print (path_optimal/game.t)
             iters += 1

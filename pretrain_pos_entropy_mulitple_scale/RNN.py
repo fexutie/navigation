@@ -53,6 +53,11 @@ class RNN(nn.Module):
         output = hidden.matmul(self.h2o)+ self.bo
         return output, hidden
     
+    def velocity(self, input, hidden, action, reward):
+        hidden_ = torch.tanh(input.matmul(self.i2h) + hidden.matmul(self.h2h) + self.k_action * action.matmul(self.a2h) + reward.matmul(self.r2h) + self.bh)
+        return torch.norm((hidden - hidden_).view(-1))
+        
+        
     def forward_sequence(self, inputs, hidden0, actions, reward, control = 0):
         # dim should be same except catting dimension
         hidden = hidden0

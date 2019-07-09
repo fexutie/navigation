@@ -36,10 +36,30 @@ import scipy
 from scipy.spatial import distance
 from scipy import signal
 
+def matrix_shuffle(M):
+    matrix = M.data.numpy()
+    m, n = matrix.shape
+    values = matrix.ravel()
+    np.random.shuffle(values)
+    matrix = values.reshape(m, n)
+    return nn.Parameter(torch.FloatTensor(matrix))
+    
+
+    
+def weight_shuffle(net, h2h = True, ah = True, bh = True, ih = True):
+    if h2h == True:
+        net.h2h = matrix_shuffle(net.h2h)
+    if ah == True:
+        net.a2h = matrix_shuffle(net.a2h)
+    if ih == True:
+        net.i2h = matrix_shuffle(net.i2h)
+    if bh == True:
+        net.bh = matrix_shuffle(net.bh)
+
 
 # attention to noise level, here corresponed to pretraining , so set noise to 1 
-def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2, epsilon = 0, limit_set = 8):
-    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = limit_set, test = test)
+def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2):
+    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = 32, test = test)
     done = False
     if init_hidden == True:
         game.hidden = game.net.initHidden()
@@ -52,8 +72,8 @@ def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torc
     State = []
     Pos = []
     Pos.append(game.agent.pos)
-    for i in range(limit_set * game.grid_size[0]):
-        pos0, state, reward, done = game.step(game.maxplay, epsilon = epsilon, test=True) # Down
+    while not done:
+        pos0, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test=True) # Down
         Hidden.append(game.hidden.data.numpy().squeeze())
         dH.append(torch.norm(game.hidden - hidden0))
         Pos.append(game.agent.pos)
@@ -75,13 +95,14 @@ def trajectory_empty(pos0, game, Stim, reward_control = 0, action_ = [], e = 0, 
     Y = []
     X = []
     dH = []
+    # it is not true hidden0
     hidden0 = game.hidden.clone()
     game.agent.pos = pos0 
     stim = game.visible_state 
 #     print (game.visible_state)
     y, x = 0, 0
     action = action_
-    for stim in Stim:
+    for iters, stim in enumerate(Stim):
         if open_loop == True:
             action = game.step_empty(stim = stim, action_ = action_, epsilon = e, open_loop = open_loop, context = context) # Down
         else:
@@ -98,10 +119,12 @@ def trajectory_empty(pos0, game, Stim, reward_control = 0, action_ = [], e = 0, 
         Y.append(game.agent.pos[0])
         X.append(game.agent.pos[1])
         Hidden.append(game.hidden.clone().data.numpy().squeeze()) # need copy , avoid same adress 
-        dH.append(torch.norm(game.hidden - hidden0))
+        if iters>0:
+            dH.append(game.hidden - hidden0)
         Action.append(action)
         hidden0 = game.hidden.clone()
-    dH = [dh.data.numpy() for dh in dH]
+    # problem here dh not converge to 0 
+    dH = [dh.data.numpy().squeeze() for dh in dH]
     return (np.array(Y), np.array(X)), np.array(Hidden), np.array(dH), np.array(Action)
 
 
@@ -121,7 +144,7 @@ def trajectory_room(pos0, game, T_total = 50, reward_control = 0, epsilon = 0, s
         pos0, state, reward, done = game.step(game.maxplay, epsilon = epsilon, test=True)
         Pos.append(game.agent.pos)
         Hidden.append(game.hidden.clone().data.numpy().squeeze()) # need copy , avoid same adress 
-        dH.append(torch.norm(game.hidden - hidden0))
+        dH.append(game.hidden - hidden0)
         Action.append(np.argmax(game.action.data.numpy()))
         hidden0 = game.hidden.clone()
     dH = [dh.data.numpy() for dh in dH]
@@ -150,7 +173,9 @@ class PCA():
                         self.game.reset(reward_control = self.reward_control, size = 15)
                         done = False 
     # put every row(time) together into one long trajectory, which means concatenation along rows - number of neurons
-    def pca(self, T_duration = 50):
+    def pca(self, T_duration = 50, shuffle = False):
+        if shuffle == True:
+            weight_shuffle(self.game.net)
         self.record(T_duration = T_duration)
         Trajectory = self.Hiddens.reshape(225 * 50, 512)
         #  take correlation out
@@ -163,7 +188,7 @@ class PCA():
         self.vals, self.vect = np.linalg.eig(cov)
         
     def Dynamics(self, T_total = 200, T_stim = 100, T_duration = 60, Hiddens = [], noise = 2, iters = 4, 
-Actions = [2, 0, 1, 3], e = 0,  same = True, legend = False, corner = False, open_loop = True, readout_random = False, h2o = 1, context = torch.zeros(1, 38)) :
+Actions = [2, 0, 1, 3, 4], e = 0,  same = True, legend = False, corner = False, open_loop = True, readout_random = False, h2o = 1, context = torch.zeros(1, 38)) :
         self.Attractors = []
         self.Timescale = []
         self.Trajectory = []
@@ -172,6 +197,7 @@ Actions = [2, 0, 1, 3], e = 0,  same = True, legend = False, corner = False, ope
         self.Actions = np.zeros((4, len(Actions),  T_total - T_stim))
         self.PCs = np.zeros((4, len(Actions), T_total))
         self.Hiddens = np.zeros((4, len(Actions), T_total - T_stim, 512))
+        self.dH = np.zeros((4, len(Actions), T_total - T_stim - 1, 512))
         # take pca for specific game 
         self.Ts = []
         # like starting for different position 
@@ -189,7 +215,6 @@ Actions = [2, 0, 1, 3], e = 0,  same = True, legend = False, corner = False, ope
             Stim3 = (T_total - (T_duration + T_stim)) * [torch.zeros(9)] 
             self.Stim = torch.stack(Stim1 + Stim2 + Stim3).view(-1, 9)
             for (iters2, action) in enumerate(Actions):
-
                 # trace in empty room 
                 Pos1, hidden1, dh1, actions = trajectory_empty(pos0, self.game, self.Stim, action_ = action, e = e, open_loop = open_loop, context = context)
                 T_transient = np.sum(dh1[T_stim:]>1e-1)
@@ -198,12 +223,14 @@ Actions = [2, 0, 1, 3], e = 0,  same = True, legend = False, corner = False, ope
                 self.PCs[iters1, iters2, :] = self.PC_traces[0, :].copy()
                 # record the hidden activity after stimulus 
                 self.Hiddens[iters1, iters2, :, :] = hidden1[T_stim:, :]
+                self.dH[iters1, iters2, :, :] = dh1[T_stim:, :]
                 # time threshold to assign limit cycle, take it for pwd
                 if T_transient > T_total - T_stim  - 1:
                     self.Trajectory.append(self.PC_traces[0][100:])
                 self.Ys[iters1, iters2] = Pos1[0][T_stim:]
                 self.Xs[iters1, iters2] = Pos1[1][T_stim:]
                 self.Actions[iters1, iters2] = actions[T_stim:]
+                
         
     def Dynamics_2clicks(self, T_total = 200, T_stim1 = [20, 3], T_stim2 = [20, 3], wall2 = -1,
                         Hiddens = [], noise = 2, iters = 4, context = torch.zeros(1, 38),
@@ -329,7 +356,7 @@ def variance_decompose(pca, T, open_loop = True, alpha = 1e-4):
         Importances.append(Importance)
     return importances
 
-def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1, context_gain = 1, num_trials = 10):
+def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1, context_gain = 1):
     # reference from net 1 
     def placefield(pos): 
         field =np.zeros((2, 19))
@@ -350,7 +377,7 @@ def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1, contex
     pca.game.net.k_stim = k_stim
     for pos_reward in [(9, 5), (9, 13)]:
         context = context_gain * placefield(pos_reward)
-        pca.Dynamics(Actions = num_trials * [0], legend = True, T_total = 200, T_stim = 30, T_duration = 3, \
+        pca.Dynamics(Actions = 10 * [0], legend = True, T_total = 200, T_stim = 30, T_duration = 3, \
                      readout_random = True, open_loop = False, e = epsilon, context = context)
         for i in range(8):
             T = 20 + i * 20
@@ -363,3 +390,9 @@ def Memory(weight, k_action = 1, k_stim = 1, k_internal = 1, epsilon = 1, contex
     Info_I = Info_I/2  
     print (np.mean(Info_A), np.mean(Info_I), np.mean(Info_P))
     return Info_A, Info_I, Info_P 
+
+
+def fixpoints(weight, hidden0 = torch.randn(1, 512, requires_grad = True), action = 4, stim = torch.zeros(1, 9)):
+    pca = PCA(weight = weight)
+    return pca.game.velocity(hidden0 = hidden0, stim = stim, action = action)
+    
