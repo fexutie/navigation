@@ -58,8 +58,8 @@ def weight_shuffle(net, h2h = True, ah = True, bh = True, ih = True):
 
 
 # attention to noise level, here corresponed to pretraining , so set noise to 1 
-def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2):
-    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = 32, test = test)
+def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(512, 512), size = 19, test = 2, epsilon = 0, limit_set = 8):
+    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = limit_set, test = test)
     done = False
     if init_hidden == True:
         game.hidden = game.net.initHidden()
@@ -73,7 +73,7 @@ def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torc
     Pos = []
     Pos.append(game.agent.pos)
     while not done:
-        pos0, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test=True) # Down
+        pos0, state, reward, done = game.step(game.maxplay, epsilon = epsilon, test=True) # Down
         Hidden.append(game.hidden.data.numpy().squeeze())
         dH.append(torch.norm(game.hidden - hidden0))
         Pos.append(game.agent.pos)
@@ -231,7 +231,27 @@ Actions = [2, 0, 1, 3, 4], e = 0,  same = True, legend = False, corner = False, 
                 self.Xs[iters1, iters2] = Pos1[1][T_stim:]
                 self.Actions[iters1, iters2] = actions[T_stim:]
                 
-        
+    def relaxation(self, T = 100, Hiddens = [], noise = 2, 
+action = 4, e = 0,  same = True, legend = False, corner = False, open_loop = True, readout_random = False, h2o = 1, context = torch.zeros(1, 38), hidden0 = torch.randn(1, 512)) :
+        self.PCs = np.zeros(T)
+        self.Hiddens = np.zeros((T, 512))
+        self.dH = np.zeros((T - 1, 512))
+        # like starting for different position 
+        # control open loop or not , if open loop false, initialize a h2o with proper gain   
+        if readout_random == True and open_loop == False:
+            self.game.net.h2o = nn.Parameter(torch.randn(512, 4) * h2o * np.sqrt(2.0/(512+4)))
+        # all stimulu actions pairs by two loops 
+        Stim = T * [torch.zeros(9)]
+        self.Stim = torch.stack(Stim).view(-1, 9)
+        # trace in empty room 
+        Pos1, hidden1, dh1, actions = trajectory_empty((9, 9), self.game, self.Stim, action_ = action, e = e, open_loop = open_loop, context = context, init_hidden = False, hidden = hidden0)
+        self.PC_traces = self.vect[:5] @ hidden1.T
+        self.PCs[:] = self.PC_traces[0, :].copy()
+        # record the hidden activity after stimulus 
+        self.Hiddens[:, :] = hidden1[:, :]
+        self.dH[:, :] = dh1[:, :]
+        return self.game.hidden
+                
     def Dynamics_2clicks(self, T_total = 200, T_stim1 = [20, 3], T_stim2 = [20, 3], wall2 = -1,
                         Hiddens = [], noise = 2, iters = 4, context = torch.zeros(1, 38),
 action = [0], e = 0,  same = True, legend = False, corner = False, open_loop = True, readout_random = False, h2o = 1) :
