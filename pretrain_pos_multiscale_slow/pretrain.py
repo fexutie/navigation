@@ -103,10 +103,10 @@ class PretrainGame(Game):
         v = self.net.velocity(stim, hidden0, self.action, self.placefield_reward((9, 5)).cuda())
         return v
     
-    def Velocity(self, inputs, hiddens):
+    def Velocity(self, inputs, hiddens, action = 4):
         Velocity = []
         for stim, hidden in zip(inputs, hiddens):
-            velocity = self.velocity(stim =  stim, hidden0 = hidden, action = 4)
+            velocity = self.velocity(stim =  stim, hidden0 = hidden, action = action)
             Velocity.append(velocity)
         return Velocity
     
@@ -187,7 +187,7 @@ class PretrainGame(Game):
                 [ 
                 {'params': self.net.h2p1, 'lr': 100 * lr_rate, 'weight_decay':0},
                 {'params': self.net.h2p2, 'lr': 100 * lr_rate, 'weight_decay':0},
-                {'params': self.net.h2p3, 'lr': 100 * lr_rate, 'weight_decay':0},
+                {'params': self.net.h2p3, 'lr': 100 * lr_rate, 'weight_decay':decay},
                 {'params': self.net.i2h, 'lr': lr_rate, 'weight_decay':0},
 #                 {'params': self.net.r2h, 'lr': lr_rate, 'weight_decay':0},
                 {'params': self.net.a2h, 'lr': lr_rate, 'weight_decay':0},    
@@ -211,10 +211,14 @@ class PretrainGame(Game):
                 hiddens = torch.stack(hiddens)
                 loss_predict1 = sum([self.net.crossentropy(predict, target, batchsize, beta = beta) for predict,target in zip(predicts1, Targets)]) 
                 loss_predict2 = sum([self.net.crossentropy(predict, target, batchsize, beta = 3 * beta) for predict,target in zip(predicts2, Targets)]) 
-                loss_predict3 = sum([self.net.crossentropy(predict, target, batchsize, beta = 9 * beta) for predict,target in zip(predicts3, Targets)]) 
-                Velocity = torch.stack(self.Velocity(Inputs, hiddens))
-                loss_slowness = torch.sum(Velocity)
-                loss_predict = loss_predict1 + loss_predict2 + loss_predict3 + loss_slowness
+                loss_predict3 = sum([self.net.crossentropy(predict, target, batchsize, beta = 9 * beta) for predict,target in zip(predicts3, Targets)])
+                loss_v = 0
+                for a in [0, 1, 2, 3]:
+                    Velocity = 1e-3 * torch.stack(self.Velocity(Inputs, hiddens, action = a))
+                    loss_v += torch.sum(Velocity)
+                Velocity_null = 1e-3 * torch.stack(self.Velocity(Inputs, hiddens, action= 4))
+                loss_slowness = torch.sum(Velocity_null)
+                loss_predict = loss_predict1 + loss_predict2 + loss_predict3 + (loss_slowness - 0.25 * loss_v)
                 loss_predict.backward(retain_graph = True)
                 # gradient clip , from -max to max
                 for p, name in zip([self.net.i2h, self.net.a2h, self.net.h2h, self.net.bh],\
@@ -224,19 +228,22 @@ class PretrainGame(Game):
                 # count for print 
                 self.Loss += loss_predict
                 self.Loss_slowness += loss_slowness
+                self.Loss_v += loss_v
                 # clear gradient 
                 self.net.zero_grad()
                 
     def fulltrain(self, lr_rate = 1e-4, decay = 1e-6, trials = 100, low = 10, high = 100, batchsize = 4, size_range = np.arange(10, 20, 1), beta = 1e-2):
         self.Loss = 0
         self.Loss_slowness = 0
+        self.Loss_v = 0
         # start to experiment
         for i in range(trials):
             Actions, Inputs, Targets = self.experiment(low = low, high = high, batchsize = batchsize, size_range = size_range)
             self.train(lr_rate, Actions, Inputs, Targets, decay = decay, beta = beta)
             if i%50 == 0 and i>0:
-                print ('loss for epoch:', self.Loss, self.Loss_slowness)
+                print ('loss for epoch:', self.Loss, self.Loss_slowness, self.Loss_v)
                 self.Loss = 0       
                 self.Loss_slowness = 0
+                self.Loss_v = 0
 
 
