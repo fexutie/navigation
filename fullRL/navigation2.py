@@ -225,7 +225,7 @@ class ValueMaxGame(Game):
         if test == False:
             TD()
         # record position and hidden state, control gradient here
-        self.Hiddens.append(self.hidden.detach())
+        self.Hiddens.append(self.hidden)
         if train_hidden == True or decode_sgd == True:
             self.Pos.append(self.placefield(self.agent.pos))
         elif decode == True:
@@ -286,7 +286,7 @@ class ValueMaxGame(Game):
         self.net.h2p_rls.data = rls.beta[:-1]
         self.net.bp_rls.data = rls.beta[-1].resize(1, 2)
     # train for Q readout
-    def train_sgd(self, lr_rate = 1e-4, batch_size = 1):
+    def train_sgd(self, lr_rate = 1e-5, batch_size = 1):
         hiddens = torch.stack(self.Hiddens_batch).view(len(self.Hiddens_batch), -1)
         targets = torch.stack(self.Targets_batch).squeeze()
         # pair h and q
@@ -294,6 +294,8 @@ class ValueMaxGame(Game):
         trainloader = torch.utils.data.DataLoader(data, batch_size = batch_size)
         optimizer = torch.optim.Adam(
                 [ 
+                {'params': self.net.h2h, 'lr': lr_rate, 'weight_decay':0},
+                {'params': self.net.bh, 'lr': lr_rate, 'weight_decay':0},
                 {'params': self.net.h2o, 'lr': lr_rate, 'weight_decay':0},
                 {'params': self.net.bo, 'lr': lr_rate, 'weight_decay':0},
                 ]
