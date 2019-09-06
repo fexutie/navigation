@@ -23,21 +23,19 @@ import gc
 
 
 class RNN(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, inertia = 0.5, k_action = 1, k_internal = 1, max_size = 20):
+    def __init__(self, input_size, hidden_size, output_size, inertia = 0.5, k_action = 1, max_size = 20):
         super(RNN, self).__init__()
         self.hidden_size = hidden_size
         self.output_size = output_size
-        self.k_action = k_action
-        self.k_internal = k_internal
         self.i2h = nn.Parameter(torch.randn(input_size, hidden_size) * 10 * np.sqrt(2.0/(input_size + hidden_size)))
-        self.h2h = nn.Parameter(torch.randn(hidden_size, hidden_size) * self.k_internal * np.sqrt(2.0/hidden_size))
+        self.h2h = nn.Parameter(torch.randn(hidden_size, hidden_size) * 1.0 * np.sqrt(2.0/hidden_size))
         self.h2o = nn.Parameter(torch.randn(hidden_size, output_size) * 0.01 * np.sqrt(2.0/(hidden_size + output_size)))
         self.h2p1 = nn.Parameter(torch.randn(hidden_size, 2 * max_size + 8) * 0.01 * np.sqrt(2.0/(hidden_size + 2 * max_size + 8)))
         self.h2p2 = nn.Parameter(torch.randn(hidden_size, 2 * max_size + 8) * 0.01 * np.sqrt(2.0/(hidden_size + 2 * max_size + 8)))
         self.h2p3 = nn.Parameter(torch.randn(hidden_size, 2 * max_size + 8) * 0.01 * np.sqrt(2.0/(hidden_size + 2 * max_size + 8)))
         self.h2p_rls = nn.Parameter(torch.randn(hidden_size, 2) * 0.01 * np.sqrt(2.0/(hidden_size + 2)))
         self.r2h = nn.Parameter(torch.randn(38, hidden_size) * 0.1 * np.sqrt(2.0/(hidden_size + 38)))
-        self.a2h = nn.Parameter(torch.randn(4, hidden_size) * self.k_action * np.sqrt(2.0/(hidden_size + 4)))
+        self.a2h = nn.Parameter(torch.randn(4, hidden_size) * 1 * np.sqrt(2.0/(hidden_size + 4)))
         self.bp1 = nn.Parameter(torch.zeros(1, 2 * max_size + 8))
         self.bp2 = nn.Parameter(torch.zeros(1, 2 * max_size + 8))
         self.bp3 = nn.Parameter(torch.zeros(1, 2 * max_size + 8))
@@ -45,12 +43,12 @@ class RNN(nn.Module):
         self.bh = nn.Parameter(torch.zeros(1, hidden_size))
         self.bo = nn.Parameter(torch.zeros(1, output_size))
         self.r = nn.Parameter(inertia * torch.ones(1, hidden_size))
-
+        self.k_action = k_action
    
 
     def forward(self, input, hidden, action, reward):
         # dim should be same except catting dimension
-        hidden_ = torch.tanh(input.matmul(self.i2h) + hidden.matmul(self.h2h) + action.matmul(self.a2h) + reward.matmul(self.r2h) + self.bh)
+        hidden_ = torch.tanh(input.matmul(self.i2h) + hidden.matmul(self.h2h) + self.k_action * action.matmul(self.a2h) + reward.matmul(self.r2h) + self.bh)
         hidden = torch.mul((1 - self.r), hidden_) + torch.mul(self.r, hidden) 
         output = hidden.matmul(self.h2o)+ self.bo
         return output, hidden
