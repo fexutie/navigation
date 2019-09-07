@@ -167,12 +167,12 @@ class GameBar():
         self.grid_size = grid_size
         self.set_reward = set_reward
         self.seed = random_seed
-        Set_reward = []
+        self.Set_reward = []
         # for the reward draw
         for pos in self.set_reward:
             y, x = pos
-            Set_reward.append((2 * VISIBLE_RADIUS + int(self.grid_size[0] * y), 2 * VISIBLE_RADIUS + int(self.grid_size[1] * x)))
-        self.grid = Grid(n_holes = holes, grid_size = grid_size, random_seed = self.seed, set_reward = Set_reward, train = False)
+            self.Set_reward.append((2 * VISIBLE_RADIUS + int(self.grid_size[0] * y), 2 * VISIBLE_RADIUS + int(self.grid_size[1] * x)))
+        self.grid = Grid(n_holes = 0, grid_size = grid_size, random_seed = self.seed, set_reward = self.Set_reward, train = False)
         self.agent = Agent()
         self.History = []
         self.values = self.grid.grid.copy()
@@ -183,7 +183,7 @@ class GameBar():
         self.holes = holes
         self.input_type = input_type
     # set limit sizes 
-    def reset(self, set_agent = 0, action = True, reward_control = 0, size = None, size_range = np.arange(10, 51, 10), prob = 5 * [0.2] , limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = []):
+    def reset(self, set_agent = 0, action = True, reward_control = 0, size = None, size_range = [15], prob = [1] , limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = []):
         """Start a new episode by resetting grid and agent"""
         # reset the reward so that it will not be erased in time 
         # set size
@@ -205,11 +205,9 @@ class GameBar():
                 radius = test
             if train == True:
                 seed = np.random.randint(self.seed_range)
-                holes = np.random.randint(100)
             else:
                 seed = self.seed
-                holes = self.holes
-            self.grid = Grid(n_holes = holes, grid_size = (self.size, self.size), random_seed = seed, set_reward = Set_reward, train = train)
+            self.grid = Grid(n_holes = 0, grid_size = (self.size, self.size), random_seed = seed, set_reward = Set_reward, train = train)
             self.grid_size = (self.grid.grid_size_y, self.grid.grid_size_x)
             if len(map_set) != 0:
                 self.grid.grid = map_set
