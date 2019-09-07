@@ -41,12 +41,12 @@ import RNN
 from RNN import * 
 
 
-def CreateGame(Game, holes = 0):
+def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
 
     class ValueMaxGame(Game):
 
-        def __init__(self,  e = 0.2, holes = 3, grid_size = 8, random_seed = 0, set_reward = 0, time_limit = 200, input_type = 0, action_control = 1, lam = 0.5, discount = 0.99, alpha = 0.5, train = True):
-            Game.__init__(self, discount=discount, grid_size=grid_size, holes=holes, time_limit=time_limit,
+        def __init__(self, e = noise, holes = 0, grid_size = 8, random_seed = 0, set_reward = 0, time_limit = 200, input_type = 0, lam = 0.5, discount = 0.99, alpha = 0.5, train = True, implicit = implicit, task = 'basic'):
+            Game.__init__(self, discount=discount, grid_size=grid_size, time_limit=time_limit,
                              random_seed=random_seed, set_reward=set_reward, input_type=input_type)
             # need to have randomness
             self.e = e
@@ -71,14 +71,11 @@ def CreateGame(Game, holes = 0):
             self.life = 0
             self.y_mid = 0
             self.x_mid = 0
+            self.holes = holes
             # control the map seed, if train == true then render seed between 0 , 1
             self.train = train
-            if len(set_reward) != 0:
-                for i in range(len(set_reward)):
-                    self.y_mid += self.set_reward[i][0]
-                    self.x_mid += self.set_reward[i][1]
-                self.y_mid /= len(set_reward)
-                self.x_mid /= len(set_reward)
+            self.implicit = implicit
+            self.task = task 
 
         def sample(self):
             # choose between 0, 1,2,3
@@ -101,12 +98,12 @@ def CreateGame(Game, holes = 0):
             field = - 0.1 * torch.from_numpy(field).resize(1, 2 * 19).float()
             return field
 
-        def maxplay(self, state, cross = False):
+        def maxplay(self, state):
             # Move according to action: 0=UP, 1=RIGHT, 2=DOWN, 3=LEFT
             # value for four action
             action0 = self.action.clone()
-            if cross == False:
-                self.values, self.hidden = self.net(state, self.hidden, self.action, self.placefield(self.pos_reward))
+            if self.implicit == True:
+                self.values, self.hidden = self.net(state, self.hidden, self.action, self.placefield(self.pos_reward_))
             else:
                 self.values, self.hidden = self.net(state, self.hidden, self.action, self.placefield(self.pos_reward))
             action = self.values.data.cpu().numpy().argmax()
@@ -129,38 +126,91 @@ def CreateGame(Game, holes = 0):
             state_t0 = self.visible_state
             pos0 = self.agent.pos
             # network dynamics and decision
-            action, action0 = policy(Variable(torch.FloatTensor(state_t0)).resize(1,9), cross = cross)
+            action, action0 = policy(Variable(torch.FloatTensor(state_t0)).resize(1, 9))
             # action to state
             self.agent.act(action)
-            pos1 = self.agent.pos
-            # check stop condition
-            y, x = pos0
-            # wall detection
-            if self.grid.grid[pos1] < 0:
-                self.agent.pos = pos0
-                pos_possible = [pos for pos in [(y-1,x),(y+1,x),(y,x-1),(y,x+1)] if self.grid.grid[pos] >= 0]
-                self.agent.pos = pos_possible[np.random.randint(len(pos_possible))]
-                pos1 = self.agent.pos
-                self.t += 1
             state_t1 = self.visible_state
-            def rewarding():
-                # punishment by cold water
-                reward = - 0.01 #* self.t
-                # punish more tunring behaivour comes from conditioning like a supersititution
-                reward = reward - 0.01 * np.int(action != torch.max(action0).data.numpy())
-                if self.grid.grid[pos1]>0:
+            pos1 = self.agent.pos
+
+            def wall(pos1):
+                y, x = pos0
+                # wall detection
+                if self.grid.grid[pos1] < 0:
+                    self.agent.pos = pos0
+                    pos_possible = [pos for pos in [(y - 1, x), (y + 1, x), (y, x - 1), (y, x + 1)] if
+                                    self.grid.grid[pos] >= 0]
+                    self.agent.pos = pos_possible[np.random.randint(len(pos_possible))]
+                    pos1 = self.agent.pos
+
+                    self.t += 1
+                    return True
+                else:
+                    return False
+            def rewarding(pos1):
+                # punish collide
+                collision = wall(pos1)
+                # punishment by cold water or click
+                if collision == True:
+                    reward = -0.5
+                else:
+                    reward = -0.01
+                if self.grid.grid[pos1] > 0:
                     reward = self.grid.grid[pos1]
                 # death
                 elif self.t >= self.time_limit:
                     reward = -1
-            # Check if agent won (reached the goal) or lost (health reached 0)
-            # attention! 需要括号， 否则reward会被更新
-                done =(reward>0 or self.t >= self.time_limit)
+                # Check if agent won (reached the goal) or lost (health reached 0)
+                # attention! 需要括号， 否则reward会被更新
+                done = (reward > 0 or self.t >= self.time_limit)
                 return reward, done
-            reward, done = rewarding()
+            def rewarding_hole(pos1):
+                # punish collide
+                collision = wall(pos1)
+                # punishment by cold water or click
+#                 if collision == True:
+#                     reward = -0.5
+                # else:
+                reward = -0.01
+                if self.grid.grid[pos1] > 0:
+                    reward = self.grid.grid[pos1]
+                # death
+                elif self.t >= self.time_limit:
+                    reward = -1
+                # Check if agent won (reached the goal) or lost (health reached 0)
+                # attention! 需要括号， 否则reward会被更新
+                done = (reward > 0 or self.t >= self.time_limit)
+                return reward, done
+            def rewarding_bar(pos1):
+                # punish collide
+                collision = wall(pos1)
+                # punishment by cold water or click
+#                 if collision == True:
+#                     reward = -0.5
+                # else:
+                reward = -0.01
+                reward = reward - 0.01 * np.int(action != torch.max(action0).data.numpy())  
+                if self.grid.grid[pos1] > 0:
+                    reward = self.grid.grid[pos1]
+                # death
+                elif self.t >= self.time_limit:
+                    reward = -1
+                # Check if agent won (reached the goal) or lost (health reached 0)
+                # attention! 需要括号， 否则reward会被更新
+                done = (reward > 0 or self.t >= self.time_limit)
+                return reward, done
+            if self.task == 'hole':
+                reward, done = rewarding_hole(pos1)
+            elif self.task == 'bar':
+                reward, done = rewarding_bar(pos1)
+            else:
+                reward, done = rewarding(pos1)
             # update value function
             def TD(decode = False):
-                realQ,_  = self.net(Variable(torch.FloatTensor(state_t1)).resize(1,9), self.hidden, self.action, self.placefield(self.pos_reward))
+                if self.implicit == True:
+                    realQ, _ = self.net(Variable(torch.FloatTensor(state_t1)).resize(1, 9), self.hidden, self.action,
+                                        self.placefield(self.pos_reward_))
+                else:
+                    realQ,_  = self.net(Variable(torch.FloatTensor(state_t1)).resize(1,9), self.hidden, self.action, self.placefield(self.pos_reward))
                 # target Q is for state before updated, it only needs to update the value assocate with action taken
                 targetQ = self.values.clone().detach()
                 # new Q attached with the new state
@@ -289,14 +339,18 @@ def CreateGame(Game, holes = 0):
             self.net.h2p_rls.data = rls.beta[:-1]
             self.net.bp_rls.data = rls.beta[-1].resize(1, 2)
 
-        def experiment(self, rls_q, rls_sl, iterations = 10, epochs = 20, epsilon = 0.5, num_episodes = 100, reward_control = None, train_hidden = False, train_q = True, decode = False, size_range = [10], test = False):
+        def experiment(self, rls_q, rls_sl, iterations=10, epochs=20, epsilon=0.0,
+                       reward_control=None, train_hidden=False, train_q=True, decode=False, size_range=[10],
+                       test=False):
             # initialize, might take data during test
             self.trace = []
             self.Qs = []
             self.Hiddens = []
             self.Pos = []
             for i in range(iterations):
-                self.episode(epochs = epochs, epsilon = epsilon, reward_control = reward_control, size_range = size_range, prob = np.ones(len(size_range))/len(size_range), train_hidden = train_hidden, test = test, decode = decode)
+                self.episode(epochs=epochs, epsilon=epsilon, reward_control=reward_control, size_range=size_range,
+                             prob=np.ones(len(size_range)) / len(size_range), train_hidden=train_hidden, test=test,
+                             decode=decode)
                 if train_hidden == False and train_q == False:
                     self.train_sl(rls_sl, i)
                 elif train_hidden == False and train_q == True:
@@ -308,98 +362,8 @@ def CreateGame(Game, holes = 0):
             print('clear session data', i, process.memory_info().rss)
 
 
-
-
-    game = ValueMaxGame(grid_size=(15, 15), holes=holes, random_seed=4, set_reward=[(0.5, 0.25), (0.5, 0.75)], input_type =0)
+    game = ValueMaxGame(grid_size=(15, 15), holes=holes, random_seed=4, set_reward=[(0.5, 0.25), (0.5, 0.75)], input_type =0, task = task)
     return game
 
 
 
-def Test(game, weights = 0, reward_control = [0], cross = False, size = 15, test = 1, limit_set = 2, start = []):
-    if weights != 0:
-        game.net.load_state_dict(torch.load(weights))
-    Rewards = 0
-    iters = 0
-    error = 0
-    step = size//15 + 1
-    for j in np.arange (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
-        for i in np.arange (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
-            if start == []:
-                pos = (j, i)
-            else:
-                pos = (start[0], start[1])
-            game.reset(set_agent = pos, reward_control = reward_control, size = size, limit_set = limit_set, test = test)
-
-            done = False
-            game.hidden = game.net.initHidden()
-            pos_r = game.set_reward[game.reward_control]
-            while not done:
-                _, state, reward, done = game.step(game.maxplay, epsilon = 0.00, test = True, cross = cross) # Down
-            if i<=pos_r[1]:
-                path_optimal = np.abs(2 * VISIBLE_RADIUS - j) + np.abs(pos_r[0] - 2 * VISIBLE_RADIUS) + np.abs(pos_r[1] - i)
-            if i>pos_r[1]:
-                path_optimal = np.abs(2 * VISIBLE_RADIUS - j) + np.abs(pos_r[0] - 2 * VISIBLE_RADIUS) + np.abs(game.grid_size[0]+1 - i)\
-                + np.abs(pos_r[1] - (game.grid_size[1]+1))
-            if reward == 1:
-                reward = path_optimal/game.t
-                if reward >=1:
-                    reward = 1
-            else:
-                reward = reward
-            Rewards += reward
-#             print (path_optimal/game.t)
-            iters += 1
-    game.Qs = []
-    game.Hiddens = []
-    game.Pos = []
-    return Rewards/(iters)
-
-
-
-def decodetest(game, weights = 0, epsilon = 0, reward_control = [0], size = 15):
-    if weights != 0:
-        game.net.load_state_dict(torch.load(weights))
-    # for the decoding upon each location
-    decodes = np.ones((size + 4, size + 4)) * 0
-    visit = np.ones((size + 4, size + 4)) * 1e-5
-    step = 1
-    Dist = []
-    Cor_y, Cor_x, n = 0, 0, 0
-    for j in range (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
-        for i in range (2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
-            game.reset(set_agent = (j, i), reward_control = reward_control, size = size, train = game.train)
-            done = False
-            start = 0
-            game.hidden = game.net.initHidden()
-            Y, X, Yp, Xp = [], [], [], []
-            while not done:
-                # not let the data to accumulate by TD, so test = true
-                pos0, state, reward, done  = game.step(game.maxplay, epsilon = epsilon, test = True) # Down
-                pos = game.decode()
-                y, x =  pos.data.numpy()[0]
-                Y.append(pos0[0])
-                X.append(pos0[1])
-                Yp.append(y)
-                Xp.append(x)
-                # start only when there is visual stimulus
-                if np.sum(state) != 0:
-                    start = 1
-                # count manhaton distance between real and predicted
-                if start == 1:
-    #                     print (pos.data.numpy()[0], game.agent.pos[0])
-                    manhantondist = np.abs((y - pos0[0])) + np.abs((x - pos0[1]))
-                    decodes[pos0] += manhantondist
-                    visit[pos0] += 1
-                    Dist.append(manhantondist)
-            # correlation
-            Y, X, Yp, Xp = np.array(Y), np.array(X), np.array(Yp), np.array(Xp)
-            if (np.var(Y)!= 0) and (np.var(X) != 0) and (np.var(Xp) != 0) and (np.var(Yp) != 0) :
-                ycor = np.corrcoef(Y, Yp)[0][1]
-                xcor = np.corrcoef(X, Xp)[0][1]
-                Cor_y += ycor
-                Cor_x += xcor
-                n += 1
-            game.Qs = []
-            game.Hiddens = []
-            game.Pos = []
-    return Dist, decodes[2*VISIBLE_RADIUS:size+2*VISIBLE_RADIUS, 2*VISIBLE_RADIUS:size+2*VISIBLE_RADIUS], visit[2*VISIBLE_RADIUS:size+2*VISIBLE_RADIUS, 2*VISIBLE_RADIUS:size+2*VISIBLE_RADIUS], Cor_y/n, Cor_x/n

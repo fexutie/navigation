@@ -32,6 +32,9 @@ from RNN import *
 import navigation2
 from navigation2 import*
 
+import Tests
+from Tests import*
+
 import sklearn
 from sklearn.svm import SVC
 
@@ -43,21 +46,21 @@ from scipy import signal
 
 # A complete experiment including pretraining , decoding training, and q learning  
 class MultipleTasks():
-    def __init__(self, weight_write, task =  'basic'):
+    def __init__(self, weight_write, task =  'basic', noise = 0.0):
         if task == 'basic':
-            self.game = CreateGame(GameBasic, holes= 0)
+            self.game = CreateGame(GameBasic, holes= 0, noise = noise, task = task)
         if task == 'hole':
-            self.game = CreateGame(GameHole, holes= 50)
+            self.game = CreateGame(GameHole, holes= 50, noise = noise, task = task)
         if task == 'bar':
-            self.game = CreateGame(GameBar, holes= 0)
+            self.game = CreateGame(GameBar, holes= 0, noise = noise, task = task)
         if task == 'scale':
-            self.game = CreateGame(GameScale, holes=0)
+            self.game = CreateGame(GameScale, holes=0, noise = noise, task = task)
         if task == 'scale_x':
-            self.game = CreateGame(GameScale_x, holes=0)
+            self.game = CreateGame(GameScale_x, holes=0, noise = noise, task = task)
         if task == 'scale_y':
-            self.game = CreateGame(GameScale_y, holes=0)
+            self.game = CreateGame(GameScale_y, holes=0, noise = noise, task = task)
         if task == 'implicit':
-            self.game = CreateGame(GameImplicit, holes=0)
+            self.game = CreateGame(GameImplicit, holes=0, noise = noise, implicit = True)
         self.weight = weight_write
         self.task = task
         print (self.task)
@@ -123,13 +126,13 @@ class MultipleTasks():
 
     
         
-    def qlearn(self, weight_read, weight_write, iterations = 10, save = True, size_train =  [15], \
-               size_test = [15], train_only = False, test_only = False, noise = 0.0, lam = 0.5, k_action = 1, h2o = True):
+    def qlearn(self, task, weight_read, weight_write, episodes = 10, save = True, size_train =  [15], \
+        size_test = [15], test_only = False, noise = 0.0, k_action = 1, h2o = True, iterations = 50, epochs = 10):
         self.game.net.load_state_dict(torch.load(weight_read))
         if h2o == True:
             self.game.net.h2o = nn.Parameter(torch.randn(512, 4) * 0.01 * np.sqrt(2.0/(512 + 4)))
         self.game.net.k_action = k_action    
-        e_rate = [noise for r in range(iterations)] 
+        e_rate = [noise for r in range(episodes)]
         rls_q = RLS(1e2, lam = 0.5)
         rls_sl = RLS(1e2)
         # q leanring phase
@@ -139,21 +142,16 @@ class MultipleTasks():
 #             self.game.seed_range = 2 + (n//10) * 10
             self.game.seed_range = 1e5
             if test_only == False:
-                self.game.experiment(rls_q, rls_sl, iterations = 50, epochs = 10, epsilon = e, size_range = size_train)
+                self.game.experiment(rls_q, rls_sl, iterations = iterations, epochs = epochs, epsilon = e, size_range = size_train)
                 if save == True:
                     torch.save(self.game.net.state_dict(), weight_write + '_{}'.format(n))
-            def testing(game):
-                Rewards00 = Test(game, reward_control = 0, size = size_test[0], test = 1)
-                Rewards01 = Test(game, reward_control = 1, size = size_test[0], test = 1)
-                rewards_s = (np.sum(Rewards00) + np.sum(Rewards01))/2
-                if len(size_test) == 1:
-                    return rewards_s
-            # load weight if test only is true
-            rewards = testing(self.game)
-            print (n, 'rewards',  rewards)
-            # adjust forget rate
-            lam = 0.5
-            rls_q.lam = lam
+            # plt.matshow(self.game.grid.grid)
+            rewards = Test(task, self.game, weight= weight_write + '_{}'.format(n), size = size_test[0], limit_set = 2)
+            if task == 'bar':
+                rls_q.lam = np.sqrt((rewards + 1)/2)
+            else:
+                rls_q.lam = 0.5
+
     
     def TestAllSizes(self, size_range = np.arange(15, 86, 10), limit_set = 8, test_size = None, grid = [], start = []):
         self.game.net.load_state_dict(torch.load(self.weight))
