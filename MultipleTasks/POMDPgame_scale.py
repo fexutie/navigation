@@ -182,10 +182,10 @@ class GameScale():
         self.size = size
         # set reward
         if len(self.set_reward) != 0:
-            Set_reward = []
+            self.Set_reward = []
             for pos in self.set_reward:
                 y, x = pos
-                Set_reward.append((2 * VISIBLE_RADIUS + int(size * y), 2 * VISIBLE_RADIUS + int(size * x)))
+                self.Set_reward.append((2 * VISIBLE_RADIUS + int(size * y), 2 * VISIBLE_RADIUS + int(size * x)))
             self.time_limit = int(self.size * limit_set) 
             radius = self.size//10 - 1
             if test!= None:
@@ -194,14 +194,14 @@ class GameScale():
                 seed = np.random.randint(5e3)
             else:
                 seed = self.seed
-            self.grid = Grid(n_holes = self.holes, grid_size = (self.size, self.size), random_seed = seed, set_reward = Set_reward)
+            self.grid = Grid(n_holes = self.holes, grid_size = (self.size, self.size), random_seed = seed, set_reward = self.Set_reward)
             self.grid_size = (self.grid.grid_size_y, self.grid.grid_size_x)
             if len(map_set) != 0:
                 self.grid.grid = map_set
             self.grid.grid[np.where(self.grid.grid == 1)] = 0
             self.reward_control = reward_control
             # this variable is used to select which reward chosen as target
-            self.pos_reward = Set_reward[reward_control]
+            self.pos_reward = self.Set_reward[reward_control]
             # select the reward 
             self.grid.grid[self.pos_reward[0]-radius: self.pos_reward[0]+1+radius, self.pos_reward[1]-radius: self.pos_reward[1]+1+radius] = 1
         else:

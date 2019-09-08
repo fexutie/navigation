@@ -187,6 +187,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
                 Rewards += reward
                 #             print (path_optimal/game.t)
                 iters += 1
+        print(pos_r)
         game.Qs = []
         game.Hiddens = []
         game.Pos = []
@@ -315,7 +316,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
         if task == 'bar':
             performance += TestBar(game, reward_control = context, size = size)
         if task == 'scale':
-            performance += TestScale(game, reward_control = context, size = size)
+            performance += TestScale(game, reward_control = context, size = 50)
         if task == 'scale_x':
             performance += TestScale_x(game, scale = 3, reward_control = context, size = size)
         if task == 'scale_y':
