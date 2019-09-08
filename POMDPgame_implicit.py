@@ -151,11 +151,11 @@ class GameImplicit():
         self.time_limit = time_limit
         self.grid_size = grid_size
         self.set_reward = set_reward
-        Set_reward = []
+        self.Set_reward = []
         for pos in self.set_reward:
             y, x = pos
-            Set_reward.append((2 * VISIBLE_RADIUS + int(self.grid_size[0] * y), 2 * VISIBLE_RADIUS + int(self.grid_size[1] * x)))
-        self.grid = Grid(n_holes = holes, grid_size = grid_size, random_seed = random_seed, set_reward = Set_reward)
+            self.Set_reward.append((2 * VISIBLE_RADIUS + int(self.grid_size[0] * y), 2 * VISIBLE_RADIUS + int(self.grid_size[1] * x)))
+        self.grid = Grid(n_holes = holes, grid_size = grid_size, random_seed = random_seed, set_reward = self.Set_reward)
         self.agent = Agent()
         self.History = []
         self.values = self.grid.grid.copy()
