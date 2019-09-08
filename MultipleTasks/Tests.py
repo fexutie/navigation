@@ -40,10 +40,10 @@ from POMDPgame_implicit import*
 import RNN 
 from RNN import *
 
-def Test(task, game, weight = 0, size = 15, limit_set = 8):
+def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
     if weight != 0:
         game.net.load_state_dict(torch.load(weight))
-    def TestBasic(game, reward_control= 0, size=15, test =0, limit_set = limit_set, start=[]):
+    def TestBasic(game, reward_control= 0, size=15, test = test_size, limit_set = limit_set, start=[]):
         Rewards = 0
         iters = 0
         error = 0
@@ -54,7 +54,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
                     pos = (j, i)
                 else:
                     pos = (start[0], start[1])
-                game.reset(set_agent=pos, reward_control=reward_control, size=size, limit_set=limit_set, test=test)
+                game.reset(set_agent=pos, reward_control=reward_control, size=size, limit_set=limit_set, test = test)
 
                 done = False
                 game.hidden = game.net.initHidden()
@@ -82,7 +82,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
         game.Pos = []
         return Rewards / (iters)
 
-    def TestBar(game, reward_control=0, cross=False, size=15, test =0, limit_set = limit_set, map_set=[], start=[]):
+    def TestBar(game, reward_control=0, cross=False, size=15, test = test_size, limit_set = limit_set, map_set=[], start=[]):
         Rewards = 0
         iters = 0
         error = 0
@@ -120,7 +120,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
         game.Pos = []
         return Rewards / (iters)
 
-    def TestHole(game, reward_control= 0, cross=False, size=15, test =0, limit_set = limit_set, seed=0, holes = 50):
+    def TestHole(game, reward_control= 0, cross=False, size=15, test = test_size, limit_set = limit_set, seed=0, holes = 50):
         Rewards = 0
         iters = 0
         error = 0
@@ -157,7 +157,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
         game.Pos = []
         return Rewards / (iters)
 
-    def TestScale(game, reward_control= 0, cross=False, size = 50, test =0, limit_set = limit_set):
+    def TestScale(game, reward_control= 0, cross=False, size = 50, test = test_size, limit_set = limit_set):
         Rewards = 0
         iters = 0
         error = 0
@@ -193,7 +193,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
         game.Pos = []
         return Rewards / (iters)
 
-    def TestScale_x(game, reward_control = 0, cross=False, size=15, test =0, limit_set = limit_set, scale = 3, start=[]):
+    def TestScale_x(game, reward_control = 0, cross=False, size=15, test = test_size, limit_set = limit_set, scale = 3, start=[]):
         Rewards = 0
         iters = 0
         error = 0
@@ -233,7 +233,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
         game.Pos = []
         return Rewards / (iters)
 
-    def TestScale_y(game,reward_control = 0, cross=False, size=15, test = 0, limit_set = limit_set, scale = 3, start=[]):
+    def TestScale_y(game,reward_control = 0, cross=False, size=15, test = test_size, limit_set = limit_set, scale = 3, start=[]):
         Rewards = 0
         iters = 0
         error = 0
@@ -273,7 +273,7 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
         game.Pos = []
         return Rewards / (iters)
 
-    def TestImplicit(game, reward_control = 0, cross=False, size=15, test =0, limit_set = limit_set):
+    def TestImplicit(game, reward_control = 0, cross=False, size=15, test = test_size, limit_set = limit_set):
         Rewards = 0
         iters = 0
         error = 0
@@ -312,11 +312,11 @@ def Test(task, game, weight = 0, size = 15, limit_set = 8):
         if task == 'basic':
             performance += TestBasic(game, reward_control = context, size = size)
         if task == 'hole':
-            performance += TestHole(game, reward_control = context, holes=50, seed = 0, size = size)
+            performance += TestHole(game, reward_control = context, holes=50, seed = 0, size = size, )
         if task == 'bar':
             performance += TestBar(game, reward_control = context, size = size)
         if task == 'scale':
-            performance += TestScale(game, reward_control = context, size = 50)
+            performance += TestScale(game, reward_control = context, size = size)
         if task == 'scale_x':
             performance += TestScale_x(game, scale = 3, reward_control = context, size = size)
         if task == 'scale_y':

@@ -204,6 +204,32 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
                 reward, done = rewarding_bar(pos1)
             else:
                 reward, done = rewarding(pos1)
+                
+            def rewarding_scale(pos1):
+                # punish collide
+                collision = wall(pos1)
+                # punishment by cold water or click
+#                 if collision == True:
+#                     reward = -0.5
+                # else:
+                reward = -0.01
+                if self.grid.grid[pos1] > 0:
+                    reward = self.grid.grid[pos1]
+                # death
+                elif self.t >= self.time_limit:
+                    reward = -1
+                # Check if agent won (reached the goal) or lost (health reached 0)
+                # attention! 需要括号， 否则reward会被更新
+                done = (reward > 0 or self.t >= self.time_limit)
+                return reward, done
+            if self.task == 'hole':
+                reward, done = rewarding_hole(pos1)
+            elif self.task == 'bar':
+                reward, done = rewarding_bar(pos1)
+            elif self.task == 'scale':
+                reward, done = rewarding_scale(pos1)
+            else:
+                reward, done = rewarding(pos1)
             # update value function
             def TD(decode = False):
                 if self.implicit == True:
