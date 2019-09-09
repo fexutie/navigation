@@ -46,6 +46,7 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
     class ValueMaxGame(Game):
 
         def __init__(self, e = noise, holes = 0, grid_size = 8, random_seed = 0, set_reward = 0, time_limit = 200, input_type = 0, lam = 0.5, discount = 0.99, alpha = 0.5, train = True, implicit = implicit, task = 'basic'):
+            print ('task', Game)
             Game.__init__(self, discount=discount, grid_size=grid_size, time_limit=time_limit,
                              random_seed=random_seed, set_reward=set_reward, input_type=input_type)
             # need to have randomness
@@ -218,10 +219,9 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
                 # death
                 elif self.t >= self.time_limit:
                     reward = -1
-                # Check if agent won (reached the goal) or lost (health reached 0)
-                # attention! 需要括号， 否则reward会被更新
                 done = (reward > 0 or self.t >= self.time_limit)
                 return reward, done
+            # rewarding accdonig to tasks 
             if self.task == 'hole':
                 reward, done = rewarding_hole(pos1)
             elif self.task == 'bar':
@@ -325,12 +325,9 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
                 # reset
                 done = False
                 if reward_control == None:
-                    self.reset(reward_control = np.random.randint(len(self.set_reward)), size = self.size)
+                    self.reset(reward_control = np.random.randint(len(self.set_reward)), size_range = size_range, prob = prob)
                 else:
-                    self.reset(reward_control = reward_control, size = self.size)
-
-    #         process = psutil.Process(os.getpid())
-    #         print('start episode', process.memory_info().rss)
+                    self.reset(reward_control = reward_control, size_range = size_range, prob = prob)
             for i in range(epochs):
                 k += 1
                 for t in range(self.size * 10):
@@ -386,7 +383,6 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
                 self.Pos_batch = []
             process = psutil.Process(os.getpid())
             print('clear session data', i, process.memory_info().rss)
-
 
     game = ValueMaxGame(grid_size=(15, 15), holes=holes, random_seed=4, set_reward=[(0.5, 0.25), (0.5, 0.75)], input_type =0, task = task)
     return game

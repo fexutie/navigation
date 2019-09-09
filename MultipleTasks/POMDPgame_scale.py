@@ -76,18 +76,6 @@ class Grid():
                 radius =self.grid_size_y//31
                 self.grid[pos_reward[0]-radius: pos_reward[0]+1+radius, pos_reward[1]-radius: pos_reward[1]+1+radius] = GOAL_VALUE
     
-    def visible1(self, pos):
-        # observable area is the squre around the agent, so 3x3 region , problem is when the agent is going to the 
-        # edge and corner of the grid
-        y, x = pos
-        y_relative = y * 19./(self.grid_size_y + 4)
-        x_relative = x * 19./(self.grid_size_x + 4)
-        visible = self.grid[y-VISIBLE_RADIUS:y+VISIBLE_RADIUS+1, x-VISIBLE_RADIUS:x+VISIBLE_RADIUS+1]
-        if np.sum(visible) != 0 and (x ==2 or x == self.grid_size_x + 1): 
-             visible = np.multiply(visible, y_relative * np.ones((3,3)) )
-        elif np.sum(visible) != 0 and (y ==2 or y == self.grid_size_y + 1): 
-             visible = np.multiply(visible, x_relative * np.ones((3,3)) )
-        return visible
     
     def visible(self, pos):
         # observable area is the squre around the agent, so 3x3 region , problem is when the agent is going to the 
@@ -114,22 +102,6 @@ class Agent():
     def act(self, action):
         # Move according to action: 0=UP, 1=RIGHT, 2=DOWN, 3=LEFT
         y, x = self.pos
-#         # wall detection,  upwall
-#         if y == 2 * VISIBLE_RADIUS and action == 0:
-#             action = [1, 2, 3][np.random.randint(3)]
-# #             action = 2 - action 
-#         # downwall
-#         elif y == self.grid_size_y - 1 + 2 * VISIBLE_RADIUS and action == 2:
-#             action = [0, 1, 3][np.random.randint(3)]
-# #             action = 2 - action  
-#         # left wall
-#         elif x == 2 * VISIBLE_RADIUS and action == 3:
-#             action = [0, 1, 2][np.random.randint(3)]
-# #             action = 4 - action 
-#         # right wall
-#         elif x == self.grid_size_x - 1 + 2 * VISIBLE_RADIUS and action == 1:
-#             action = [0, 2, 3][np.random.randint(3)]
-# #             action = 4 - action   
         # up 
         if action == 0: y -= 1
         # right
@@ -172,11 +144,10 @@ class GameScale():
     # set limit sizes 
     def reset(self, set_agent = 0, action = True, reward_control = 0, size = None, size_range = np.arange(10, 51, 10), prob = 5 * [0.2] , limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = []):
         """Start a new episode by resetting grid and agent"""
-        # reset the reward so that it will not be erased in time 
-        # set size
         if size == None:
+            np.random.seed()
             size = size_range[np.random.choice(len(size_range), p=prob)]
-
+#             print (size)
         else:
             size = size
         self.size = size
@@ -190,23 +161,18 @@ class GameScale():
             radius = self.size//10 - 1
             if test!= None:
                 radius = test
-            if train == True:
-                seed = np.random.randint(5e3)
-            else:
-                seed = self.seed
-            self.grid = Grid(n_holes = self.holes, grid_size = (self.size, self.size), random_seed = seed, set_reward = self.Set_reward)
+            self.grid = Grid(n_holes = self.holes, grid_size = (self.size, self.size), random_seed = self.seed, set_reward = self.Set_reward)
             self.grid_size = (self.grid.grid_size_y, self.grid.grid_size_x)
-            if len(map_set) != 0:
-                self.grid.grid = map_set
-            self.grid.grid[np.where(self.grid.grid == 1)] = 0
+            self.grid.grid[2:2+self.size, 2:2+self.size] = 0
             self.reward_control = reward_control
             # this variable is used to select which reward chosen as target
             self.pos_reward = self.Set_reward[reward_control]
+            self.pos_reward_ = self.Set_reward[1 - reward_control]
             # select the reward 
             self.grid.grid[self.pos_reward[0]-radius: self.pos_reward[0]+1+radius, self.pos_reward[1]-radius: self.pos_reward[1]+1+radius] = 1
         else:
             y, x = context
-            self.grid.grid[np.where(self.grid.grid == 1)] = 0
+            self.grid.grid[2:2+self.size, 2:2+self.size] = 0
             self.pos_reward = (2 * VISIBLE_RADIUS + int(self.size * y), 2 * VISIBLE_RADIUS + int(self.size * x))
         # set position 
         self.agent.reset(self.grid_size, set_agent = set_agent)
@@ -215,6 +181,7 @@ class GameScale():
             self.action = self.net.initAction()
         self.t = 0
         self.reward = 0
+ 
  
            
     
