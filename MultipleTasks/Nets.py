@@ -146,7 +146,7 @@ class MultipleTasks():
                 if save == True:
                     torch.save(self.game.net.state_dict(), weight_write + '_{}'.format(n))
             # plt.matshow(self.game.grid.grid)
-            rewards = Test(task, self.game, weight= weight_write + '_{}'.format(n), size = size_test[0], limit_set = 2)
+            rewards = Test(task, self.game, weight= weight_write + '_{}'.format(n), size = size_test[0], limit_set = 2, test_size = self.game.size//10  - 1)
             if task == 'bar':
                 rls_q.lam = np.sqrt((rewards + 1)/2)
             else:

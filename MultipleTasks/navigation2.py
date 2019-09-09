@@ -45,7 +45,7 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
 
     class ValueMaxGame(Game):
 
-        def __init__(self, e = noise, holes = 0, grid_size = 8, random_seed = 0, set_reward = 0, time_limit = 200, input_type = 0, lam = 0.5, discount = 0.99, alpha = 0.5, train = True, implicit = implicit, task = 'basic'):
+        def __init__(self, e = noise, holes = 0, grid_size = 8, random_seed = 0, set_reward = 0, time_limit = 200, input_type = 0, lam = 0.5, discount = 0.99, alpha = 0.5, implicit = implicit, task = 'basic'):
             print ('task', Game)
             Game.__init__(self, discount=discount, grid_size=grid_size, time_limit=time_limit,
                              random_seed=random_seed, set_reward=set_reward, input_type=input_type)
@@ -74,7 +74,6 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
             self.x_mid = 0
             self.holes = holes
             # control the map seed, if train == true then render seed between 0 , 1
-            self.train = train
             self.implicit = implicit
             self.task = task 
 
@@ -325,9 +324,9 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
                 # reset
                 done = False
                 if reward_control == None:
-                    self.reset(reward_control = np.random.randint(len(self.set_reward)), size_range = size_range, prob = prob)
+                    self.reset(reward_control = np.random.randint(len(self.set_reward)), size = self.size)
                 else:
-                    self.reset(reward_control = reward_control, size_range = size_range, prob = prob)
+                    self.reset(reward_control = reward_control, size = self.size)
             for i in range(epochs):
                 k += 1
                 for t in range(self.size * 10):
