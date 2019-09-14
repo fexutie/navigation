@@ -127,11 +127,12 @@ class MultipleTasks():
     
         
     def qlearn(self, task, weight_read, weight_write, episodes = 10, save = True, size_train =  [15], \
-        size_test = [15], test_only = False, noise = 0.0, k_action = 1, h2o = True, iterations = 50, epochs = 10):
+        size_test = [15], test_only = False, noise = 0.0, k_action = 1, k_internal = 1, h2o = True, iterations = 50, epochs = 10):
         self.game.net.load_state_dict(torch.load(weight_read))
         if h2o == True:
             self.game.net.h2o = nn.Parameter(torch.randn(512, 4) * 0.01 * np.sqrt(2.0/(512 + 4)))
         self.game.net.k_action = k_action    
+        self.game.net.k_internal = k_internal        
         e_rate = [noise for r in range(episodes)]
         rls_q = RLS(1e2, lam = 0.5)
         rls_sl = RLS(1e2)
@@ -146,7 +147,7 @@ class MultipleTasks():
                 if save == True:
                     torch.save(self.game.net.state_dict(), weight_write + '_{}'.format(n))
             # plt.matshow(self.game.grid.grid)
-            rewards = Test(task, self.game, weight= weight_write + '_{}'.format(n), size = size_test[0], limit_set = 2, test_size = self.game.size//10  - 1)
+            rewards = Test(task, self.game, weight= weight_write + '_{}'.format(n), size = size_test[0], limit_set = 2)
             if task == 'bar':
                 rls_q.lam = np.sqrt((rewards + 1)/2)
             else:
@@ -172,7 +173,7 @@ class MultipleTasks():
             
 # attention to noise level, here corresponed to pretraining , so set noise to 1 
 def trajectory(game, pos0, reward_control = 0, init_hidden = True, hidden = torch.zeros(1, 512), size = 19, test = 2, wind = (0, 0), map_set = [], limit_set = 32, epsilon = 0):
-    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = limit_set, test = test, train = False, map_set = map_set)
+    game.reset(set_agent = pos0, reward_control = reward_control, size = size, limit_set = limit_set, test = test)
     done = False
     if init_hidden == True:
         game.hidden = game.net.initHidden()
@@ -239,15 +240,11 @@ def trajectory_empty(pos0, game, T = 50, T0 = 100, Time_stop = 60, reward_contro
 
 ## Principle components in real game and relaxation settings 
 class PCA():
-    def __init__(self, size = 15, reward_control = 0,  weight = None, net = 1, trial = 0, epsilon = 1, time_limit = 4):
+    def __init__(self, weigth = None, size = 15, reward_control = 0,  weight = None, net = 1, trial = 0, epsilon = 1, time_limit = 4):
         self.epsilon = epsilon
         self.reward_control = reward_control
-        if weight == None:
-            self.weight = 'weights_cpu{}/rnn_1515tanh512_checkpoint{}'.format(net, trial)
-        else: 
-            self.weight = weight
-        self.game = ValueMaxGame(grid_size = (size, size), holes = 0, random_seed = 4 , set_reward = [(0.5, 0.25), (0.5, 0.75)], input_type = 0, action_control = 1, 
-                                 discount = 0.9, alpha = 1, time_limit=100, lam = 0.5)
+        self.weight = weight
+        self.game = CreateGame(GameBasic, holes = 0)
         self.game.net.load_state_dict(torch.load(self.weight))
         self.trial = trial
         self.size = size

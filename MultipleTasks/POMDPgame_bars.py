@@ -31,8 +31,7 @@ GRID_SIZE = 8
 NUM_HOLES = 4
 # enviroment and behaviour, without moving out of wall 
 class Grid():
-    def __init__(self, n_holes = 4, grid_size = GRID_SIZE, random_seed = 0, set_reward = 0, ry = 5, rx = 5, train = True, direction = None):
-        random.seed(random_seed)
+    def __init__(self, n_holes = 4, grid_size = GRID_SIZE, set_reward = 0, ry = 5, rx = 5, train = True, direction = None):
         # check type of grid,  attention type is not a string
         if type(grid_size) == int:
             self.grid_size_y = self.grid_size_x = grid_size
@@ -54,6 +53,7 @@ class Grid():
         
         # Randomly placed plants and intialize them with random values 
         if train == True:
+            np.random.seed()
             rx = rx - 2 + np.random.randint(5)
             ry = ry - 2 + np.random.randint(5)
             # return a number for block length
@@ -161,53 +161,41 @@ class Agent():
 # 
 class GameBar():
     # 初始化，初始grid和agent
-    def __init__(self, grid_size = 8, holes = 4, discount = 0.99, time_limit = 200, random_seed = 0, set_reward = 0, input_type = 0):
+    def __init__(self, grid_size = 8, holes = 4, discount = 0.99, time_limit = 200, set_reward = 0, input_type = 0, random_seed = 0):
         self.discount = discount
         self.time_limit = time_limit
         self.grid_size = grid_size
         self.set_reward = set_reward
-        self.seed = random_seed
         self.Set_reward = []
         # for the reward draw
         for pos in self.set_reward:
             y, x = pos
             self.Set_reward.append((2 * VISIBLE_RADIUS + int(self.grid_size[0] * y), 2 * VISIBLE_RADIUS + int(self.grid_size[1] * x)))
-        self.grid = Grid(n_holes = 0, grid_size = grid_size, random_seed = self.seed, set_reward = self.Set_reward, train = False)
+        self.grid = Grid(n_holes = 0, grid_size = grid_size, set_reward = self.Set_reward, train = False)
         self.agent = Agent()
         self.History = []
         self.values = self.grid.grid.copy()
         self.values.fill(0)
         self.t = 0
-        self.seed = random_seed
-        self.seed_range = 2
         self.holes = holes
         self.input_type = input_type
     # set limit sizes 
-    def reset(self, set_agent = 0, action = True, reward_control = 0, size = None, size_range = [15], prob = [1] , limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = []):
+    def reset(self, set_agent = 0, action = True, reward_control = 0, size = 15, limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = [], size_range = [], prob = [], scale = None):
         """Start a new episode by resetting grid and agent"""
         # reset the reward so that it will not be erased in time 
         # set size
-        if size == None:
-            size = size_range[np.random.choice(len(size_range), p=prob)]
-
-        else:
-            size = size
-        self.size = size
+        self.size = size 
         # set reward
         if len(self.set_reward) != 0:
             Set_reward = []
             for pos in self.set_reward:
                 y, x = pos
-                Set_reward.append((2 * VISIBLE_RADIUS + int(size * y), 2 * VISIBLE_RADIUS + int(size * x)))
+                Set_reward.append((2 * VISIBLE_RADIUS + int(self.size * y), 2 * VISIBLE_RADIUS + int(self.size * x)))
             self.time_limit = int(self.size * limit_set) 
             radius = self.size//10 - 1
             if test!= None:
                 radius = test
-            if train == True:
-                seed = np.random.randint(self.seed_range)
-            else:
-                seed = self.seed
-            self.grid = Grid(n_holes = 0, grid_size = (self.size, self.size), random_seed = seed, set_reward = Set_reward, train = train)
+            self.grid = Grid(n_holes = 0, grid_size = (self.size, self.size), set_reward = Set_reward, train = train)
             self.grid_size = (self.grid.grid_size_y, self.grid.grid_size_x)
             if len(map_set) != 0:
                 self.grid.grid = map_set

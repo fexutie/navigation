@@ -148,36 +148,28 @@ class GameScale_y():
         self.holes = holes
         self.input_type = input_type
     # set limit sizes 
-    def reset(self, set_agent = 0, action = True, reward_control = 0, size = None, size_range = np.arange(10, 51, 10), prob = 5 * [0.2] , limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = [], scale = None):
+    def reset(self, set_agent = 0, action = True, reward_control = 0, size = 15 , limit_set = 8, test = None, context = (0.5, 0.25), train = True, map_set = [], scale = None, size_range = np.arange(10, 51, 10), prob = 5 * [0.2]):
         """Start a new episode by resetting grid and agent"""
         # reset the reward so that it will not be erased in time 
         # set size
-        if size == None:
-            size = size_range[np.random.choice(len(size_range), p=prob)]
-
-        else:
-            size = size
         self.size = size
         # set reward
         if len(self.set_reward) != 0:
             radius = self.size//10 - 1
             if test!= None:
                 radius = test
-            if train == True:
-                k = np.random.randint(1, 4)
-            elif scale != None:
-                k = scale
+            if (scale == None) or (train == True):
+                np.random.seed()
+                self.scale = np.random.randint(1, 4)
             else:
-                k = np.random.randint(1, 4)
-            self.time_limit = int(k * self.size * limit_set)
+                self.scale = scale
+            self.time_limit = int(self.scale * self.size * limit_set)
             self.Set_reward = []
             for pos in self.set_reward:
                 y, x = pos
-                self.Set_reward.append((2 * VISIBLE_RADIUS + int(k * size * y), 2 * VISIBLE_RADIUS + int(size * x)))
-            self.grid = Grid(n_holes = 0, grid_size = (k * self.size, self.size), random_seed = 0, set_reward = self.Set_reward, train = train)
+                self.Set_reward.append((2 * VISIBLE_RADIUS + int(self.scale * size * y), 2 * VISIBLE_RADIUS + int(size * x)))
+            self.grid = Grid(n_holes = 0, grid_size = (self.scale * self.size, self.size), random_seed = 0, set_reward = self.Set_reward, train = train)
             self.grid_size = (self.grid.grid_size_y, self.grid.grid_size_x)
-            if len(map_set) != 0:
-                self.grid.grid = map_set
             self.grid.grid[np.where(self.grid.grid == 1)] = 0
             self.reward_control = reward_control
             # this variable is used to select which reward chosen as target

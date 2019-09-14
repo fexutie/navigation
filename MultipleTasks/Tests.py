@@ -40,6 +40,20 @@ from POMDPgame_implicit import*
 import RNN 
 from RNN import *
 
+GOAL_VALUE = 1
+EDGE_VALUE = -1
+HOLE_VALUE = -1
+VISIBLE_RADIUS = 1
+GRID_SIZE = 8
+NUM_HOLES = 4
+
+GOAL_VALUE = 1
+EDGE_VALUE = -1
+HOLE_VALUE = -1
+VISIBLE_RADIUS = 1
+GRID_SIZE = 8
+NUM_HOLES = 4
+
 def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
     if weight != 0:
         game.net.load_state_dict(torch.load(weight))
@@ -86,9 +100,8 @@ def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
         Rewards = 0
         iters = 0
         error = 0
-        step = size // 15 + 1
-        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
-            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
+            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
                 if start == []:
                     pos = (j, i)
                 else:
@@ -161,9 +174,8 @@ def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
         Rewards = 0
         iters = 0
         error = 0
-        step = size // 15 + 1
-        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
-            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
+            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
                 game.reset(set_agent=(j, i), reward_control=reward_control, size=size, limit_set=limit_set, test=test)
 
                 done = False
@@ -197,9 +209,8 @@ def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
         Rewards = 0
         iters = 0
         error = 0
-        step = size // 15 + 1
-        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
-            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
+            for i in np.arange(2 * VISIBLE_RADIUS, scale * size + 2 * VISIBLE_RADIUS):
                 if start == []:
                     pos = (j, i)
                 else:
@@ -237,9 +248,8 @@ def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
         Rewards = 0
         iters = 0
         error = 0
-        step = size // 15 + 1
-        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
-            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+        for j in np.arange(2 * VISIBLE_RADIUS, scale * size + 2 * VISIBLE_RADIUS):
+            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
                 if start == []:
                     pos = (j, i)
                 else:
@@ -277,9 +287,8 @@ def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
         Rewards = 0
         iters = 0
         error = 0
-        step = size // 15 + 1
-        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
-            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS, step):
+        for j in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
+            for i in np.arange(2 * VISIBLE_RADIUS, size + 2 * VISIBLE_RADIUS):
                 game.reset(set_agent=(j, i), reward_control=reward_control, size=size, limit_set=limit_set, test=test)
 
                 done = False
