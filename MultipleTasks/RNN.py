@@ -23,24 +23,25 @@ import gc
 
 
 class RNN(nn.Module):
-    def __init__(self, input_size = 9, hidden_size = 512, output_size = 4, predict_size = 5, inertia = 0.5, k_action = 0, reward_size = 38):
+    def __init__(self, input_size, hidden_size, output_size, inertia = 0.5, k_action = 1, max_size = 20):
         super(RNN, self).__init__()
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.i2h = nn.Parameter(torch.randn(input_size, hidden_size) * 10 * np.sqrt(2.0/(input_size + hidden_size)))
-        self.h2h = nn.Parameter(torch.randn(hidden_size, hidden_size) * 1 * np.sqrt(2.0/hidden_size))
+        self.h2h = nn.Parameter(torch.randn(hidden_size, hidden_size) * 1.0 * np.sqrt(2.0/hidden_size))
         self.h2o = nn.Parameter(torch.randn(hidden_size, output_size) * 0.01 * np.sqrt(2.0/(hidden_size + output_size)))
+        self.h2p1 = nn.Parameter(torch.randn(hidden_size, 2 * max_size + 8) * 0.01 * np.sqrt(2.0/(hidden_size + 2 * max_size + 8)))
+        self.h2p2 = nn.Parameter(torch.randn(hidden_size, 2 * max_size + 8) * 0.01 * np.sqrt(2.0/(hidden_size + 2 * max_size + 8)))
+        self.h2p3 = nn.Parameter(torch.randn(hidden_size, 2 * max_size + 8) * 0.01 * np.sqrt(2.0/(hidden_size + 2 * max_size + 8)))
         self.h2p_rls = nn.Parameter(torch.randn(hidden_size, 2) * 0.01 * np.sqrt(2.0/(hidden_size + 2)))
         self.r2h = nn.Parameter(torch.randn(38, hidden_size) * 0.1 * np.sqrt(2.0/(hidden_size + 38)))
         self.a2h = nn.Parameter(torch.randn(4, hidden_size) * 1 * np.sqrt(2.0/(hidden_size + 4)))
+        self.bp1 = nn.Parameter(torch.zeros(1, 2 * max_size + 8))
+        self.bp2 = nn.Parameter(torch.zeros(1, 2 * max_size + 8))
+        self.bp3 = nn.Parameter(torch.zeros(1, 2 * max_size + 8))
         self.bp_rls = nn.Parameter(torch.zeros(1, 2))
         self.bh = nn.Parameter(torch.zeros(1, hidden_size))
         self.bo = nn.Parameter(torch.zeros(1, output_size))
-        # decoder 
-        self.I2p = nn.Parameter(torch.randn(hidden_size + input_size + output_size + reward_size, predict_size) * 0.01 * np.sqrt(2.0/(output_size + hidden_size)))
-        self.h2a = nn.Parameter(torch.randn(2 * hidden_size + input_size + reward_size, output_size) * 0.01 * np.sqrt(2.0/(output_size + hidden_size)))
-        self.bp = nn.Parameter(torch.randn(1, predict_size) * 0 * np.sqrt(2.0/(predict_size + hidden_size)))  
-        self.ba = nn.Parameter(torch.randn(1, output_size) * 0 * np.sqrt(2.0/(output_size + hidden_size)))  
         self.r = nn.Parameter(inertia * torch.ones(1, hidden_size))
         self.k_action = k_action
    
@@ -55,45 +56,39 @@ class RNN(nn.Module):
     def forward_sequence(self, inputs, hidden0, actions, reward, control = 0):
         # dim should be same except catting dimension
         hidden = hidden0
-        predicts = []
+        predicts1 = []
+        predicts2 = []
+        predicts3 = []
         hiddens = []
         for input_, action in zip(inputs, actions):  
             hidden_ = F.tanh(input_.matmul(self.i2h) + hidden.matmul(self.h2h) + self.k_action * action.matmul(self.a2h) + reward.matmul(self.r2h) + self.bh)
             hidden = torch.mul((1 - self.r), hidden_) + torch.mul(self.r, hidden) 
+            predicts1.append(hidden.matmul(self.h2p1) + self.bp1) 
+            predicts2.append(hidden.matmul(self.h2p2) + self.bp2) 
+            predicts3.append(hidden.matmul(self.h2p3) + self.bp3) 
             hiddens.append(hidden)
-        return hiddens
+        return predicts1, predicts2, predicts3, hiddens
 
-    def forward_decode(self, inputs, hiddens, actions, reward, control = 0):
-        Stim = []
-        for input_, action, hidden in zip(inputs, actions, hiddens):
-            Input = torch.cat([input_, action, hidden, reward], dim = 1)
-            stim_next = Input.matmul(self.I2p) + self.bp 
-            Stim.append(stim_next)
-        return Stim
-    
-    def inverse_dynamics(self, inputs, hiddens1, hiddens2, reward, control = 0):
-        Acts = []
-        for input_, hidden1, hidden2 in zip(inputs, hiddens1, hiddens2):
-#             print (input_.size(), action.size(), hidden.size(), reward.size())
-            Input = torch.cat([input_, hidden1, hidden2, reward], dim = 1)
-            act_next = Input.matmul(self.h2a) + self.ba 
-            Acts.append(act_next)
-        return Acts
-    
     def initHidden(self, batchsize = 1):
         return Variable(torch.randn(batchsize, self.hidden_size))
     
     def initAction(self, batchsize = 1):
         return Variable(torch.zeros(batchsize, self.output_size))
     
-    def velocity(self, input, hidden, action, reward):
-        hidden_ = torch.tanh(input.matmul(self.i2h) + hidden.matmul(self.h2h) + self.k_action * action.matmul(self.a2h) + reward.matmul(self.r2h) + self.bh)
-        return torch.norm((hidden - hidden_).view(-1))
-    
     @ staticmethod
-    def crossentropy(predict, target, batch_size):
-        return torch.mean(- F.softmax(target.view(batch_size,-1), dim = 1) \
-                        * torch.log(F.softmax(predict.view(batch_size,-1), dim = 1) + 1e-2)) 
+    def crossentropy(predict, target, batch_size, beta = 1e-2):
+        return torch.mean(-F.softmax(- beta * target.view(batch_size,-1)) \
+                        * torch.log(F.softmax(- beta * predict.view(batch_size,-1), dim = 1) + 1e-5)) 
+    
+class decoder(nn.Module):
+    def __init__(self, hidden_size, output_size):
+        super(decoder, self).__init__()
+        self.h2p = nn.Parameter(torch.randn(hidden_size, output_size) * 1 * np.sqrt(2.0/(hidden_size + 2 * output_size + 8)))
+        self.bp = nn.Parameter(torch.randn(1, output_size) * 1 * np.sqrt(2.0/(hidden_size + 2 * output_size + 8)))    
+    def forward(self, hidden):
+        # dim should be same except catting dimension
+        output = hidden.matmul(self.h2p)+ self.bp
+        return output
     
 # recursive least square is used, mtraix P which is inverse correlaiton of input and beta is updated in a recursive way, pay attention to memory related to matrix inversion  
 class LinearRegression(torch.nn.Module):

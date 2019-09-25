@@ -18,8 +18,8 @@ import matplotlib.animation
 import seaborn as sns
 from IPython.display import HTML
 
-# import pretrain
-# from pretrain import *
+import pretrain
+from pretrain import *
 
 import navigation2
 from navigation2 import *

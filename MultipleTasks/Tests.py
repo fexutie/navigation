@@ -282,6 +282,7 @@ def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
         game.Hiddens = []
         game.Pos = []
         return Rewards / (iters)
+    
 
     def TestImplicit(game, reward_control = 0, cross=False, size=15, test = test_size, limit_set = limit_set):
         Rewards = 0
@@ -330,6 +331,8 @@ def Test(task, game, weight = 0, size = 15, test_size = 0, limit_set = 8):
             performance += TestScale_x(game, scale = 3, reward_control = context, size = size)
         if task == 'scale_y':
             performance += TestScale_y(game, scale = 3, reward_control = context, size = size)
+        if task == 'scale_xy':
+            performance += TestScale_xy(game, scale = (3, 3), reward_control = context, size = size)
         if task == 'implicit':
             performance += TestImplicit(game, reward_control = context, size = size)
     print (task + '', 'performance', performance/2)

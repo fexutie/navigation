@@ -47,7 +47,7 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
     class ValueMaxGame(Game):
 
         def __init__(self, e = noise, holes = 0, grid_size = 8, random_seed = 0, set_reward = 0, time_limit = 200, input_type = 0, lam = 0.5, discount = 0.99, alpha = 0.5, implicit = implicit, task = 'basic'):
-#             print ('task', Game)
+            print ('task', Game)
             Game.__init__(self, discount=discount, grid_size=grid_size, time_limit=time_limit,
                              random_seed=random_seed, set_reward=set_reward, input_type=input_type)
             # need to have randomness
@@ -98,16 +98,6 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
             # gaussian density, but before exponential to help learning identity mapping input to output
             field = - 0.1 * torch.from_numpy(field).resize(1, 2 * 19).float()
             return field
-        
-        def velocity(self, stim = torch.zeros(1, 9), hidden0 = torch.randn(1, 512, requires_grad = True), action = 4):
-            # Move according to action: 0=UP, 1=RIGHT, 2=DOWN, 3=LEFT
-            # value for four action  
-            if action<=3:
-                self.action = torch.eye(4)[action].resize(1, 4)
-            else:
-                self.action = 0.25 * torch.ones(4).resize(1, 4)
-            velocity = self.net.velocity(stim, hidden0, self.action, self.placefield(torch.zeros(1, 38)))
-            return velocity 
 
         def maxplay(self, state):
             # Move according to action: 0=UP, 1=RIGHT, 2=DOWN, 3=LEFT
