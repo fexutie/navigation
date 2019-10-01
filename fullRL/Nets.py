@@ -42,25 +42,24 @@ import scipy
 from scipy.spatial import distance
 from scipy import signal
 
-gpu = 1
 
 # A complete experiment including pretraining , decoding training, and q learning  
 class MultipleTasks():
-    def __init__(self, weight_write, task =  'basic', noise = 0.0):
+    def __init__(self, weight_write, task =  'basic', noise = 0.0, gpu = 0):
         if task == 'basic':
-            self.game = CreateGame(GameBasic, holes= 0, noise = noise, task = task)
+            self.game = CreateGame(GameBasic, holes= 0, noise = noise, task = task, gpu = gpu)
         if task == 'hole':
-            self.game = CreateGame(GameHole, holes= 50, noise = noise, task = task)
+            self.game = CreateGame(GameHole, holes= 50, noise = noise, task = task, gpu = gpu)
         if task == 'bar':
-            self.game = CreateGame(GameBar, holes= 0, noise = noise, task = task)
+            self.game = CreateGame(GameBar, holes= 0, noise = noise, task = task, gpu = gpu)
         if task == 'scale':
-            self.game = CreateGame(GameScale, holes=0, noise = noise, task = task)
+            self.game = CreateGame(GameScale, holes=0, noise = noise, task = task, gpu = gpu)
         if task == 'scale_x':
-            self.game = CreateGame(GameScale_x, holes=0, noise = noise, task = task)
+            self.game = CreateGame(GameScale_x, holes=0, noise = noise, task = task, gpu = gpu)
         if task == 'scale_y':
-            self.game = CreateGame(GameScale_y, holes=0, noise = noise, task = task)
+            self.game = CreateGame(GameScale_y, holes=0, noise = noise, task = task, gpu = gpu)
         if task == 'implicit':
-            self.game = CreateGame(GameImplicit, holes=0, noise = noise, implicit = True)
+            self.game = CreateGame(GameImplicit, holes=0, noise = noise, implicit = True, gpu = gpu)
         self.weight = weight_write
         self.task = task
         print (self.task)

@@ -43,8 +43,9 @@ from RNN import *
 import torch
 import torch.utils.data
 
-gpu = 1
-def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
+
+
+def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic', gpu = 0):
 
     class ValueMaxGame(Game):
 
@@ -54,7 +55,8 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
                              random_seed=random_seed, set_reward=set_reward, input_type=input_type)
             # need to have randomness
             self.e = e
-            self.net = RNN(9, 512, 4, k_action = 1).cuda(gpu)
+            self.gpu = gpu
+            self.net = RNN(9, 512, 4, k_action = 1).cuda(self.gpu)
             self.hidden = self.net.initHidden()
             self.action = self.net.initAction()
             self.Loss = 0
@@ -98,7 +100,7 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
                     field[k, i] =  (i- pos_relative) ** 2
     #                 print (i - pos[k])e
             # gaussian density, but before exponential to help learning identity mapping input to output
-            field = - 0.1 * torch.from_numpy(field).cuda(gpu).resize(1, 2 * 19).float()
+            field = - 0.1 * torch.from_numpy(field).cuda(self.gpu).resize(1, 2 * 19).float()
             return field
 
         def maxplay(self, state):
@@ -106,15 +108,15 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
             # value for four action
             action0 = self.action.clone()
             if self.implicit == True:
-                self.values, self.hidden = self.net(state.cuda(gpu), self.hidden.cuda(gpu), self.action.cuda(gpu), self.placefield(self.pos_reward_).cuda(gpu))
+                self.values, self.hidden = self.net(state.cuda(self.gpu), self.hidden.cuda(self.gpu), self.action.cuda(self.gpu), self.placefield(self.pos_reward_).cuda(self.gpu))
             else:
                 # print(self.action, self.hidden, self.placefield(self.pos_reward), state)
-                self.values, self.hidden = self.net(state.cuda(gpu), self.hidden.cuda(gpu), self.action.cuda(gpu), self.placefield(self.pos_reward).cuda(gpu))
+                self.values, self.hidden = self.net(state.cuda(self.gpu), self.hidden.cuda(self.gpu), self.action.cuda(self.gpu), self.placefield(self.pos_reward).cuda(self.gpu))
             action = self.values.data.cpu().numpy().argmax()
             # action to state
             if np.random.random()< self.e:
                 action = self.sample()
-            self.action = torch.eye(4)[action].resize(1, 4).cuda(gpu)
+            self.action = torch.eye(4)[action].resize(1, 4).cuda(self.gpu)
             return action, action0
     #  decode is binary
         def decode(self):
@@ -130,7 +132,7 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
             state_t0 = self.visible_state
             pos0 = self.agent.pos
             # network dynamics and decision
-            action, action0 = policy(torch.FloatTensor(state_t0).cuda(gpu).resize(1, 9))
+            action, action0 = policy(torch.FloatTensor(state_t0).cuda(self.gpu).resize(1, 9))
             # action to state
             self.agent.act(action)
             state_t1 = self.visible_state
@@ -230,20 +232,20 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
             # update value function
             def TD(decode = False):
                 if self.implicit == True:
-                    realQ, _ = self.net(Variable(torch.FloatTensor(state_t1)).resize(1, 9).cuda(gpu), self.hidden, self.action,
+                    realQ, _ = self.net(Variable(torch.FloatTensor(state_t1)).resize(1, 9).cuda(self.gpu), self.hidden, self.action,
                                         self.placefield(self.pos_reward_))
                 else:
-                    realQ,_  = self.net(Variable(torch.FloatTensor(state_t1)).resize(1,9).cuda(gpu), self.hidden, self.action, self.placefield(self.pos_reward))
+                    realQ,_  = self.net(Variable(torch.FloatTensor(state_t1)).resize(1,9).cuda(self.gpu), self.hidden, self.action, self.placefield(self.pos_reward))
                 # target Q is for state before updated, it only needs to update the value assocate with action taken
                 targetQ = self.values.clone().detach()
                 # new Q attached with the new state
                 # max of q for calculating td error
                 Qmax = torch.max(realQ)
                 if done != True:
-                    delta  =  torch.FloatTensor([reward]).cuda(gpu) + self.discount*Qmax  - targetQ[0, action]
+                    delta  =  torch.FloatTensor([reward]).cuda(self.gpu) + self.discount*Qmax  - targetQ[0, action]
             # the virtual max action reaches terminal , there is no q max term assciate with next max value
                 elif done == True:
-                    delta  =  torch.FloatTensor([reward]).cuda(gpu)- targetQ[0, action]
+                    delta  =  torch.FloatTensor([reward]).cuda(self.gpu)- targetQ[0, action]
                 # eligilibty trace for updating all last states before because of the information about new state
                 self.trace = [e * self.discount * self.lam for e in self.trace]
                 # eligibility trace attach new state
@@ -266,7 +268,7 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
             if train_hidden == True:
                 self.Pos.append(self.placefield())
             elif decode == True:
-                self.Pos.append(torch.FloatTensor([pos0[0], pos0[1]]).resize(1, 2)).cuda(gpu)
+                self.Pos.append(torch.FloatTensor([pos0[0], pos0[1]]).resize(1, 2)).cuda(self.gpu)
     #         print (pos1)
             return pos0, state_t0, reward, done
 
@@ -318,8 +320,8 @@ def CreateGame(Game, holes = 0, implicit = False, noise = 0, task = 'basic'):
 
         # if use random tensor , there is no memory leak,  if use hiddens and targets for beta but not really update weight, still leak,  so the error is in between
         def train_sgd(self, lr_rate=1e-5, batch_size=8):
-                hiddens = torch.stack(self.Hiddens_batch).view(int(len(self.Hiddens_batch)/batch_size), batch_size, -1).cuda(gpu)
-                targets = torch.stack(self.Targets_batch).squeeze().view(int(len(self.Hiddens_batch)/batch_size), batch_size, -1).cuda(gpu)
+                hiddens = torch.stack(self.Hiddens_batch).view(int(len(self.Hiddens_batch)/batch_size), batch_size, -1).cuda(self.gpu)
+                targets = torch.stack(self.Targets_batch).squeeze().view(int(len(self.Hiddens_batch)/batch_size), batch_size, -1).cuda(self.gpu)
                 # pair h and q
                 data = [(h, p) for h, p in zip(hiddens, targets)]
                 trainloader = torch.utils.data.DataLoader(data, batch_size=batch_size)
