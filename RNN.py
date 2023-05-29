@@ -46,28 +46,28 @@ class RNN(nn.Module):
         self.k_action = k_action
    
 
-    def forward(self, input, hidden, action, reward):
+    def forward(self, input, hidden):
         # dim should be same except catting dimension
-        hidden_ = torch.tanh(input.matmul(self.i2h) + hidden.matmul(self.h2h) + self.k_action * action.matmul(self.a2h) + reward.matmul(self.r2h) + self.bh)
+        hidden_ = torch.tanh(input.matmul(self.i2h) + hidden.matmul(self.h2h) + self.bh)
         hidden = torch.mul((1 - self.r), hidden_) + torch.mul(self.r, hidden) 
         output = hidden.matmul(self.h2o)+ self.bo
         return output, hidden
     
-    def forward_sequence(self, inputs, hidden0, actions, reward, control = 0):
+    def forward_sequence(self, inputs, hidden0):
         # dim should be same except catting dimension
         hidden = hidden0
         predicts1 = []
         predicts2 = []
         predicts3 = []
         hiddens = []
-        for input_, action in zip(inputs, actions):  
-            hidden_ = F.tanh(input_.matmul(self.i2h) + hidden.matmul(self.h2h) + self.k_action * action.matmul(self.a2h) + reward.matmul(self.r2h) + self.bh)
+        for input_, action in zip(inputs):
+            hidden_ = F.tanh(input_.matmul(self.i2h) + hidden.matmul(self.h2h) + self.bh)
             hidden = torch.mul((1 - self.r), hidden_) + torch.mul(self.r, hidden) 
-            predicts1.append(hidden.matmul(self.h2p1) + self.bp1) 
-            predicts2.append(hidden.matmul(self.h2p2) + self.bp2) 
-            predicts3.append(hidden.matmul(self.h2p3) + self.bp3) 
+            # predicts1.append(hidden.matmul(self.h2p1) + self.bp1)
+            # predicts2.append(hidden.matmul(self.h2p2) + self.bp2)
+            # predicts3.append(hidden.matmul(self.h2p3) + self.bp3)
             hiddens.append(hidden)
-        return predicts1, predicts2, predicts3, hiddens
+        return  hiddens
 
     def initHidden(self, batchsize = 1):
         return Variable(torch.randn(batchsize, self.hidden_size))
